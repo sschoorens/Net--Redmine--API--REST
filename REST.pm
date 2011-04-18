@@ -480,6 +480,9 @@ $hash           A reference on a hash construct like this :
 sub post_issue {
     my ( $self, $hash ) = @_;
     my $ref_hash = $self->hash_verification($hash,'post');
+    if ($ref_hash == 0){
+	croak q{The HashRef isn't well constructed};
+    }
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
@@ -489,7 +492,9 @@ sub post_issue {
     $request->content($json);
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	$self->load_issues;
+	if defined($self->Issues){
+	      $self->load_issues;
+	}
         return 0;
     }
     else {
@@ -548,7 +553,9 @@ sub put_issue {
     $request->content($json);
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	$self->load_issues;
+	if defined($self->Issues){
+	      $self->load_issues;
+	}
         return 0;
     }
     else {
@@ -590,7 +597,9 @@ sub delete_issue {
       HTTP::Request->new( DELETE => $self->{Url} . '/issues/' . $id . '.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	$self->load_issues;
+	if defined($self->Issues){
+	      $self->load_issues;
+	}
         return 0;
     }
     else {
@@ -1132,14 +1141,15 @@ sub post_user {
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $json = encode_json $ref_hash ;
-    say $json;
     my $request = HTTP::Request->new( POST => $self->{Url} . '/users.json' );
     $request->header( 'Content-Type' => 'application/json' );
     $request->content($json);
     my $response = $ua->request($request);
     say Dumper $response;
     if ( $response->is_success ) {
-	$self->load_users;
+	if defined($self->Users){
+	      $self->load_Users;
+	}
         return 0;
     }
     else {
@@ -1199,7 +1209,9 @@ sub put_user {
     $request->content($json);
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	$self->load_users;
+	if defined($self->Users){
+	      $self->load_Users;
+	}
         return 0;
     }
     else {
