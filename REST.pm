@@ -1105,9 +1105,9 @@ $hash           A reference on a hash construct like this :
 
 =head3 Return :
 
-0         when the POST request it's done
+$id       when the POST request it's done
 
-1         if the function failed
+0         if the function failed
 
 =head3 Use Exemple :  
 
@@ -1141,11 +1141,14 @@ sub post_user {
     my $response = $ua->request($request);
     say Dumper $response;
     if ( $response->is_success ) {
+	say Dumper $response->decoded_content;
+	my $user = decode_json $response->decoded_content ;
+	my $id = $user->{'user'}->{'id'};
 	$self->load_users;
-        return 0;
+        return $id;
     }
     else {
-        return 1;
+        return 0;
     }
 }
 
@@ -1171,9 +1174,9 @@ $hash           A reference on a hash construct like this :
 
 =head3 Return :
 
-0               when the PUT request it's done
+1               when the PUT request it's done
 
-1               if the function failed
+0               if the function failed
 
 =head3 Use Exemple : 
 
@@ -1202,10 +1205,10 @@ sub put_user {
     my $response = $ua->request($request);
     if ( $response->is_success ) {
 	$self->load_users;
-        return 0;
+        return 1;
     }
     else {
-        return 1;
+        return 0;
     }
 }
 
