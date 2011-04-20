@@ -476,7 +476,7 @@ $id        when the POST request it's done
     }
 
 =cut
-use Data::Dumper;
+
 sub post_issue {
     my ( $self, $hash ) = @_;
     my $ref_hash = $self->hash_verification($hash,'post');
@@ -571,9 +571,9 @@ $id             Issue's ID
 
 =head3 Return :
 
-0               return 0 when the delete request is done
+1               return 0 when the delete request is done
 
-1               if the function failed
+0               if the function failed
 
 =head3 Use Exemple :    
 
@@ -593,10 +593,10 @@ sub delete_issue {
     my $response = $ua->request($request);
     if ( $response->is_success ) {
 	$self->load_issues;
-        return 0;
+        return 1;
     }
     else {
-        return 1;
+        return 0;
     }
 }
 
