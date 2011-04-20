@@ -447,9 +447,9 @@ $hash           A reference on a hash construct like this :
 
 =head3 Return :
 
-0         when the POST request it's done
+$id        when the POST request it's done
 
-1         if the function failed
+0         if the function failed
 
 =head3 Use Exemple :  
 
@@ -476,13 +476,10 @@ $hash           A reference on a hash construct like this :
     }
 
 =cut
-
+use Data::Dumper;
 sub post_issue {
     my ( $self, $hash ) = @_;
     my $ref_hash = $self->hash_verification($hash,'post');
-    if ($ref_hash == 0){
-	croak q{The HashRef isn't well constructed};
-    }
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
@@ -492,13 +489,13 @@ sub post_issue {
     $request->content($json);
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	if defined($self->Issues){
-	      $self->load_issues;
-	}
-        return 0;
+	my $issue = decode_json $response->decoded_content ;
+	my $id = $issue->{'issue'}->{'id'};
+	$self->load_issues;
+        return $id;
     }
     else {
-        return 1;
+        return 0;
     }
 }
 
@@ -553,9 +550,7 @@ sub put_issue {
     $request->content($json);
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	if defined($self->Issues){
-	      $self->load_issues;
-	}
+	$self->load_issues;
         return 0;
     }
     else {
@@ -597,9 +592,7 @@ sub delete_issue {
       HTTP::Request->new( DELETE => $self->{Url} . '/issues/' . $id . '.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	if defined($self->Issues){
-	      $self->load_issues;
-	}
+	$self->load_issues;
         return 0;
     }
     else {
@@ -1141,15 +1134,14 @@ sub post_user {
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $json = encode_json $ref_hash ;
+    say $json;
     my $request = HTTP::Request->new( POST => $self->{Url} . '/users.json' );
     $request->header( 'Content-Type' => 'application/json' );
     $request->content($json);
     my $response = $ua->request($request);
     say Dumper $response;
     if ( $response->is_success ) {
-	if defined($self->Users){
-	      $self->load_Users;
-	}
+	$self->load_users;
         return 0;
     }
     else {
@@ -1209,9 +1201,7 @@ sub put_user {
     $request->content($json);
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-	if defined($self->Users){
-	      $self->load_Users;
-	}
+	$self->load_users;
         return 0;
     }
     else {
