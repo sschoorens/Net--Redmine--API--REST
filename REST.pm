@@ -471,7 +471,7 @@ $id        when the POST request it's done
                 'priority' => 'hot',
             }
     };
-    if ($object->post_issue($hash) == 0){
+    if ($object->post_issue($hash) > 0 ){
         say 'Great Job !';
     }
 
@@ -519,9 +519,9 @@ $hash           A reference on a hash construct like this :
 
 =head3 Return :
 
-0               when the PUT request it's done
+1               when the PUT request it's done
 
-1               if the function failed
+0               if the function failed
 
 =head3 Use Exemple : 
 
@@ -532,7 +532,7 @@ $hash           A reference on a hash construct like this :
             'notes' => 'this is a note for redmine issue'
         }
     };
-    if ($object->put_issue($id,$hash) == 0){
+    if ($object->put_issue($id,$hash) == 1){
         say 'Great Job !';
     }
 =cut
@@ -551,10 +551,10 @@ sub put_issue {
     my $response = $ua->request($request);
     if ( $response->is_success ) {
 	$self->load_issues;
-        return 0;
+        return 1;
     }
     else {
-        return 1;
+        return 0;
     }
 }
 
@@ -1120,7 +1120,7 @@ $id       when the POST request it's done
                       'login' => 'toto',
             }
     };
-    if ($object->post_user($hash) == 0){
+    if ($object->post_user($hash) > 0){
         say 'Great Job !';
     }
 
@@ -1186,7 +1186,7 @@ $hash           A reference on a hash construct like this :
             'mail' => 'toto@fake.com'
         }
     };
-    if ($object->put_issue($id,$hash) == 0){
+    if ($object->put_issue($id,$hash) == 1){
         say 'Great Job !';
     }
 =cut
