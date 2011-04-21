@@ -213,7 +213,16 @@ sub load_projects{
       my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json' );
       my $response = $ua->request($request);
       if ( $response->is_success ) {
-	$self->{'Projects'} = decode_json $response->content;
+	my $projects = decode_json $response->content;
+        my $count = $projects->{'total_count'};
+	my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json?limit='.$count);      
+        my $response = $ua->request($request);
+         if ( $response->is_success ) { 
+	      $self->{'Projects'} = decode_json $response->content;
+         }
+         else {
+             croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+         }
       }
       else {
         croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
@@ -248,7 +257,18 @@ sub load_users{
       my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json' );
       my $response = $ua->request($request);
       if ( $response->is_success ) {
-	$self->{'Users'} = decode_json $response->content;
+        my $users = decode_json $response->content;
+        my $count = $users->{'total_count'};
+        my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json?limit='.$count);  
+        my $response = $ua->request($request);
+         
+         if ( $response->is_success ) { 
+              $self->{'Users'} = decode_json $response->content;
+         }
+         else {
+             croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+         }
+
       }
       else {
         croak  $response->status_line . "\n" . 'Check your config object please (perhaps you need access right to load users) ' ."\n" ;
@@ -283,7 +303,17 @@ sub load_issues{
       my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json' );
       my $response = $ua->request($request);
       if ( $response->is_success ) {
-	$self->{'Issues'} = decode_json $response->content;
+	my $issues = decode_json $response->content;
+        my $count = $issues->{'total_count'};
+        my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json?limit='.$count);
+        my $response = $ua->request($request);
+         if ( $response->is_success ) {
+              $self->{'Issues'} = decode_json $response->content;
+         }
+         else {
+             croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+         }
+
       }
       else {
         croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
@@ -1618,7 +1648,7 @@ sub delete_project_by_id {
 
 sub delete_project_by_name {
     my ( $self, $name ) = @_;
-    if ( defined ( $self->project_name_to_id($name)  ) ){
+    if ( defined ( $self->project_name_to_id($name) ) ){
       return ( $self->delete_project_by_id( $self->project_name_to_id($name) ) );
     }
     else{
