@@ -116,7 +116,7 @@ has Statuses    => ( is => 'rw', isa => 'HashRef' );
 has Priorities  => ( is => 'rw', isa => 'HashRef' );
 has Trackers    => ( is => 'rw', isa => 'HashRef' );
 has Categories  => ( is => 'rw', isa => 'HashRef' );
-has LastError   => ( is => 'rw', isa => 'Str', default  => 'No error occured' );
+has LastError   => ( is => 'rw', isa => 'Str', default  => 'No error occured'."\n" );
 
 sub BUILD {
   my $self = shift ;
@@ -143,7 +143,7 @@ $error          a string who was the last error
 
 =head3 Use Exemple :    
 
-    $object->get_last_error;
+    print $object->get_last_error;
 
 =cut
 
