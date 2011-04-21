@@ -18,7 +18,7 @@ Net::Redmine::API::REST - REST API for Redmine's GET,POST,PUT,DELETE manipulatio
         PassWord => 'pass'
     );  # object for methods using 
 
-    my $ref_hash = $object->get-issue('1'); # Call of the method get_issue
+    my $ref_hash = $object->get_issue_by_id('1'); # Call of the method get_issue_by_id
 
 =head1 DESCRIPTION
 
@@ -41,7 +41,7 @@ This is a module for Redmine's GET,POST,PUT,DELETE manipulation in order :
 
   -use GET,POST,PUT,DELETE object's methods
    exemple : 
-    $object->get_issue('1');
+    $object->get_issue_by_id('1');
 
 =head1 AUTHOR
 
@@ -290,7 +290,7 @@ sub load_issues{
       }
 }
 
-=head2 get_issue
+=head2 get_issue_by_id
 
 =head3 Description : 
 
@@ -308,11 +308,11 @@ undef           if the function failed
 
 =head3 Use Exemple :    
 
-    my $ref_hash=$object->get_issue($id);
+    my $ref_hash=$object->get_issue_by_id($id);
 
 =cut
 
-sub get_issue {
+sub get_issue_by_id {
     my ( $self, $id ) = @_;
     if ( !(($id) =~ /^\d+$/) ){
       croak 'the id : "'.$id.'" is not an integer '."\n";
@@ -347,6 +347,38 @@ sub get_issue {
     
 }
 
+=head2 get_issue_by_subject
+
+=head3 Description : 
+
+return a reference on a hash who contains the issue
+
+=head3 Parametre :
+
+$subject   issue's Subject
+
+=head3 Return :
+
+$issue       return a reference on a hash
+
+undef        if not exists
+
+=head3 Use Exemple :    
+
+    my $ref_hash=$object->get_issue_by_subject('test');
+
+=cut
+
+sub get_issue_by_subject {
+    my ( $self, $subject ) = @_;
+    if ( defined ( $self->issue_subject_to_id($subject)  ) ){
+      return ( $self->get_issue_by_id( $self->issue_subject_to_id($subject) ) );   
+    }
+    else{
+       return undef; 
+    }
+}
+
 =head2 get_issues
 
 =head3 Description : 
@@ -359,7 +391,7 @@ nothing
 
 =head3 Return :
 
-$ref_hash       return a reference on a hash
+$issue          return a reference on a hash
 
 1               if the function failed
 
@@ -597,6 +629,60 @@ sub delete_issue {
     }
     else {
         return 0;
+    }
+}
+
+=head2 issue_subject_to_id
+
+=head3 Description : 
+
+Return the id of the issue's subject.
+
+=head3 Parametre :
+
+$subject           Issue's Subject
+
+=head3 Return :
+
+$id             return the id when the project exist
+
+undef           if the function failed
+
+=head3 Use Exemple :    
+
+    if( defined( $object->issue_subject_to_id($subject) ) ){
+        say 'your issue ".$subject." have the id '.$object->issue_subject_to_id($subject);
+    }
+
+=cut
+
+sub issue_subject_to_id{
+    my ( $self, $subject ) = @_;
+    if ( defined ( $self->{'Issues'} ) ){
+      my $issue;
+      my $i=0;
+      while ( defined( $issue=$self->{'Issues'}->{'issues'}[$i] ) ) {
+              if ($issue->{'subject'} eq $subject){
+                  return  $issue->{'id'};
+              }
+              else{
+              $i++;
+              }
+        }
+      return undef;
+    }else{
+      $self-> load_issues ;
+      my $issue;
+      my $i=0;
+      while ( defined( $issue=$self->{'Issues'}->{'issues'}[$i] ) ) {
+              if ($issue->{'subject'} eq $subject){
+                  return  $issue->{'id'};
+              }
+              else{
+              $i++;
+              }
+        }
+      return undef;
     }
 }
 
@@ -994,7 +1080,7 @@ sub hash_verification{
      }
   }
 }
-=head2 get_user
+=head2 get_user_by_id
 
 =head3 Description : 
 
@@ -1012,11 +1098,11 @@ undef           if the function failed
 
 =head3 Use Exemple :    
 
-    my $ref_hash=$object->get_user($id);
+    my $ref_hash=$object->get_user_by_id($id);
 
 =cut
 
-sub get_user {
+sub get_user_by_id {
     my ( $self, $id ) = @_;
     if ( !(($id) =~ /^\d+$/) ){
       croak 'the id : "'.$id.'" is not an integer '."\n";
@@ -1047,6 +1133,38 @@ sub get_user {
 	      }
 	}
        return undef;
+    }
+}
+
+=head2 get_user_by_name
+
+=head3 Description : 
+
+return a reference on a hash who contains the user
+
+=head3 Parametre :
+
+$name           User's Name
+
+=head3 Return :
+
+$user           return a reference on a hash
+
+undef           if not exists or locked
+
+=head3 Use Exemple :    
+
+    my $ref_hash=$object->get_user_by_name('toto');
+
+=cut
+
+sub get_user_by_name {
+    my ( $self, $name ) = @_;
+    if ( defined ( $self->user_name_to_id($name)  ) ){
+      return ( $self->get_user_by_id( $self->user_name_to_id($name) ) );
+    }
+    else{
+     return undef;
     }
 }
 
@@ -1211,5 +1329,94 @@ sub put_user {
         return 0;
     }
 }
+
+=head2 get_project_by_id
+
+=head3 Description : 
+
+return a reference on a hash who contains the project
+
+=head3 Parametre :
+
+$id   project's ID
+
+=head3 Return :
+
+$project        return a reference on a hash
+
+undef           if the function failed
+
+=head3 Use Exemple :    
+
+    my $ref_hash=$object->get_project_by_id($id);
+
+=cut
+
+sub get_project_by_id {
+    my ( $self, $id ) = @_;
+    if ( !(($id) =~ /^\d+$/) ){
+      croak 'the id : "'.$id.'" is not an integer '."\n";
+    }
+    if ( defined ( $self->{'Projects'} ) ) {
+        my $project;
+        my $i=0;
+        while ( defined($project=$self->{'Projects'}->{'projects'}[$i] ) ) {
+              if ($project->{'id'} eq $id){
+                  return  $project;
+              }
+              else{
+              $i++;
+              }
+        }
+        return undef;
+    }
+    else{
+      $self->load_projects;
+      my $project;
+      my $i=0;
+      while ( defined( $project=$self->{'Projects'}->{'projects'}[$i] ) ) {
+              if ($project->{'id'} eq $id){
+                  return  $project;
+              }
+              else{
+              $i++;
+              }
+        }
+       return undef;
+   }
+}
+
+=head2 get_project_by_name
+
+=head3 Description : 
+
+return a reference on a hash who contains the project
+
+=head3 Parametre :
+
+$name           Project's Name
+
+=head3 Return :
+
+$project           return a reference on a hash
+
+undef           if not exists or locked
+
+=head3 Use Exemple :    
+
+    my $ref_hash=$object->get_project_by_name('test');
+
+=cut
+
+sub get_project_by_name {
+    my ( $self, $name ) = @_;
+    if ( defined ( $self->project_name_to_id($name)  ) ){
+      return ( $self->get_project_by_id( $self->project_name_to_id($name) ) );
+    }
+    else{
+     return undef;
+    }
+}
+
 
 1;
