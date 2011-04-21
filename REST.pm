@@ -531,7 +531,7 @@ sub post_issue {
     }
 }
 
-=head2 put_issue
+=head2 put_issue_by_id
 
 =head3 Description : 
 
@@ -564,12 +564,12 @@ $hash           A reference on a hash construct like this :
             'notes' => 'this is a note for redmine issue'
         }
     };
-    if ($object->put_issue($id,$hash) == 1){
+    if ($object->put_issue_by_id($id,$hash) == 1){
         say 'Great Job !';
     }
 =cut
 
-sub put_issue {
+sub put_issue_by_id {
     my ( $self, $id, $hash ) = @_;
     my $ua = LWP::UserAgent->new;
     my $ref_hash = $self->hash_verification($hash,'put');
@@ -591,7 +591,7 @@ sub put_issue {
 }
 
 
-=head2 delete_issue
+=head2 delete_issue_by_id
 
 =head3 Description : 
 
@@ -603,19 +603,19 @@ $id             Issue's ID
 
 =head3 Return :
 
-1               return 0 when the delete request is done
+1               return 1 when the delete request is done
 
 0               if the function failed
 
 =head3 Use Exemple :    
 
-    if( $object->delete_issue($id) == 0 ){
+    if( $object->delete_issue_by_id($id) == 1 ){
         say 'you have deleted the issue '.$id;
     }
 
 =cut
 
-sub delete_issue {
+sub delete_issue_by_id {
     my ( $self, $id ) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
@@ -739,15 +739,15 @@ sub project_name_to_id{
     }
 }
 
-=head2 user_name_to_id
+=head2 user_login_to_id
 
 =head3 Description : 
 
-Return the id of the user's name.
+Return the id of the user's login.
 
 =head3 Parametre :
 
-$name           User's Name
+$login           User's Login
 
 =head3 Return :
 
@@ -757,19 +757,19 @@ undef           if the function failed
 
 =head3 Use Exemple :    
 
-    if( defined( $object->user_name_to_id($name) ) ){
-        say 'your user ".$name." have the id '.$object->user_name_to_id($name);
+    if( defined( $object->user_login_to_id($login) ) ){
+        say 'your user ".$login." have the id '.$object->user_login_to_id($login);
     }
 
 =cut
 
-sub user_name_to_id{
-    my ( $self, $name ) = @_;
+sub user_login_to_id{
+    my ( $self, $login ) = @_;
     if ( defined ( $self->{'Users'} ) ){
 	my $user;
 	my $i=0;
 	while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
-	      if ($user->{'login'} eq $name){
+	      if ($user->{'login'} eq $login){
 		  return  $user->{'id'};
 	      }
 	      else{
@@ -783,7 +783,7 @@ sub user_name_to_id{
 	my $user;
 	my $i=0;
 	while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
-	      if ($user->{'login'} eq $name){
+	      if ($user->{'login'} eq $login){
 		  return  $user->{'id'};
 	      }
 	      else{
@@ -1008,10 +1008,10 @@ sub hash_verification{
 			  $res->{'category_id'} = $self->category_name_to_id($v);
 		      }
 		      case 'author' {
-			  $res->{'author_id'} = $self->user_name_to_id($v);
+			  $res->{'author_id'} = $self->user_login_to_id($v);
 		      }
 		      case 'assigned_to' {
-			  $res->{'assigned_to_id'} = $self->user_name_to_id($v);
+			  $res->{'assigned_to_id'} = $self->user_login_to_id($v);
 		      }
 		      case 'project' {
 			  $res->{'project_id'} = $self->project_name_to_id($v);
@@ -1045,10 +1045,10 @@ sub hash_verification{
 			  $res->{'category_id'} = $self->category_name_to_id($v);
 		      }
 		      case 'author' {
-			  $res->{'author_id'} = $self->user_name_to_id($v);
+			  $res->{'author_id'} = $self->user_login_to_id($v);
 		      }
 		      case 'assigned_to' {
-			  $res->{'assigned_to_id'} = $self->user_name_to_id($v);
+			  $res->{'assigned_to_id'} = $self->user_login_to_id($v);
 		      }
 		      case 'project' {
 			  $res->{'project_id'} = $self->project_name_to_id($v);
@@ -1074,6 +1074,19 @@ sub hash_verification{
       else{
       return $hash ;
       }
+     }
+     case 'project' {
+        if  ($action eq 'post'){
+          if ( defined($hash->{'project'}{'name'}) and defined($hash->{'project'}{'identifier'}) ){
+              return $hash ;
+          }
+          else{
+              return 0 ;
+          }
+        }
+        else{
+          return $hash ;
+        }
      }
      else {
 	  return 0;
@@ -1160,8 +1173,8 @@ undef           if not exists or locked
 
 sub get_user_by_name {
     my ( $self, $name ) = @_;
-    if ( defined ( $self->user_name_to_id($name)  ) ){
-      return ( $self->get_user_by_id( $self->user_name_to_id($name) ) );
+    if ( defined ( $self->user_login_to_id($name)  ) ){
+      return ( $self->get_user_by_id( $self->user_login_to_id($name) ) );
     }
     else{
      return undef;
@@ -1242,22 +1255,19 @@ $id       when the POST request it's done
         say 'Great Job !';
     }
 
-=cut1
+=cut
 
 sub post_user {
     my ( $self, $hash ) = @_;
     my $ua = LWP::UserAgent->new;
     my $ref_hash = $self->hash_verification($hash,'post');
-    say Dumper $ref_hash;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $json = encode_json $ref_hash ;
-    say $json;
     my $request = HTTP::Request->new( POST => $self->{Url} . '/users.json' );
     $request->header( 'Content-Type' => 'application/json' );
     $request->content($json);
     my $response = $ua->request($request);
-    say Dumper $response;
     if ( $response->is_success ) {
 	say Dumper $response->decoded_content;
 	my $user = decode_json $response->decoded_content ;
@@ -1272,12 +1282,12 @@ sub post_user {
 
 
 
-=head2 put_user
+=head2 put_user_by_id
 
 =head3 Description : 
 
 Send a PUT request with the hash value to the user. You can lock a user by passing { 'status' => '3' } unlock  { 'status' => '1' }
-1
+
 =head3 Parametre :
 
 $id             User's ID
@@ -1304,12 +1314,12 @@ $hash           A reference on a hash construct like this :
             'mail' => 'toto@fake.com'
         }
     };
-    if ($object->put_issue($id,$hash) == 1){
+    if ($object->put_user_by_id($id,$hash) == 1){
         say 'Great Job !';
     }
 =cut
 
-sub put_user {
+sub put_user_by_id {
     my ( $self, $id, $hash ) = @_;
     my $ua = LWP::UserAgent->new;
     my $ref_hash = $self->hash_verification($hash,'put');
@@ -1327,6 +1337,16 @@ sub put_user {
     }
     else {
         return 0;
+    }
+}
+
+sub put_user_by_login {
+    my ( $self, $login, $hash ) = @_;
+    if ( defined ( $self->user_login_to_id($login)  ) ){
+      return ( $self->put_user_by_id( $self->user_login_to_id($login),$hash ) );
+    }
+    else{
+     return undef;
     }
 }
 
@@ -1418,5 +1438,192 @@ sub get_project_by_name {
     }
 }
 
+=head2 post_project
+
+=head3 Description : 
+
+Send a POST request with the hash value
+  elements :
+       name (required): the project name
+       identifier (required): the project identifier
+       description
+
+
+
+
+=head3 Parametre :
+
+$hash           A reference on a hash construct like this : 
+
+    my $hash={
+        'project' =>
+            { 
+                'Redmine key' => 'Value',
+            }
+    };1
+
+=head3 Return :
+
+$id       when the POST request it's done
+
+0         if the function failed
+
+=head3 Use Exemple :  
+
+    my $hash={
+        'project' =>
+            {
+                      'name' => 'Test2',
+                      'identifier' => 'test',
+                      'description' => 'test',
+            }
+    };
+    if ($object->post_project($hash) > 0){
+        say 'Great Job !';
+    }
+
+=cut
+
+sub post_project {
+    my ( $self, $hash ) = @_;
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash = $self->hash_verification($hash,'post');
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $json = encode_json $ref_hash ;
+    my $request = HTTP::Request->new( POST => $self->{Url} . '/projects.json' );
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        my $project = decode_json $response->decoded_content ;
+        my $id = $project->{'project'}->{'id'};
+        $self->load_projects;
+        return $id;
+    }
+    else {
+        return 0;
+    }
+}
+
+=head2 put_project_by_id
+
+=head3 Description : 
+
+Send a PUT request with the hash value to the project.
+
+=head3 Parametre :
+
+$id             Project's ID
+
+$hash           A reference on a hash construct like this : 
+    my $hash={
+        'project' =>
+        {
+            'Redmine key' => 'Value',
+        }
+    };
+
+=head3 Return :
+
+1               when the PUT request it's done
+
+0               if the function failed
+
+=head3 Use Exemple : 
+
+    my $hash={
+        'project' =>
+        { 
+            'name' => 'put_test'
+        }
+    };
+    if ($object->put_project_by_id($id,$hash) == 1){
+        say 'Great Job !';
+    }
+=cut
+
+sub put_project_by_id {
+    my ( $self, $id, $hash ) = @_;
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash = $self->hash_verification($hash,'put');
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( PUT => $self->{Url} . '/projects/' . $id . '.json' );
+    my $json = encode_json $ref_hash ;
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->load_projects;
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+sub put_project_by_name {
+    my ( $self, $name,$hash ) = @_;
+    if ( defined ( $self->project_name_to_id($name)  ) ){
+      return ( $self->put_project_by_id( $self->project_name_to_id($name),$hash ) );
+    }
+    else{
+     return undef;
+    }
+}
+
+=head2 delete_project_by_id
+
+=head3 Description : 
+
+Delete an project by id.
+
+=head3 Parametre :
+
+$id             Project's ID
+
+=head3 Return :
+
+1               return 1 when the delete request is done
+
+0               if the function failed
+
+=head3 Use Exemple :    
+
+    if( $object->delete_project_by_id($id) == 1 ){
+        say 'you have deleted the project '.$id;
+    }
+
+=cut
+
+
+sub delete_project_by_id {
+    my ( $self, $id ) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( DELETE => $self->{Url} . '/projects/' . $id . '.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->load_projects;
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+sub delete_project_by_name {
+    my ( $self, $name ) = @_;
+    if ( defined ( $self->project_name_to_id($name)  ) ){
+      return ( $self->delete_project_by_id( $self->project_name_to_id($name) ) );
+    }
+    else{
+     return undef;
+    }
+}
 
 1;
