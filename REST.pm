@@ -104,18 +104,19 @@ use Carp;
 
 our $VERSION = '0.001';
 
-has Url    => ( is => 'rw', isa => 'Str', required => 1 );
-has Server => ( is => 'rw', isa => 'Str', required => 1 );
-has Port   => ( is => 'rw', isa => 'Str', default  => '80' );
-has UserName   => ( is => 'rw', isa => 'Str' );
-has PassWord   => ( is => 'rw', isa => 'Str' );
-has Projects => ( is => 'rw', isa => 'HashRef' );
-has Issues => ( is => 'rw', isa => 'HashRef' );
-has Users => ( is => 'rw', isa => 'HashRef' );
-has Statuses => ( is => 'rw', isa => 'HashRef' );
-has Priorities => ( is => 'rw', isa => 'HashRef' );
-has Trackers => ( is => 'rw', isa => 'HashRef' );
-has Categories => ( is => 'rw', isa => 'HashRef' );
+has Url         => ( is => 'rw', isa => 'Str', required => 1 );
+has Server      => ( is => 'rw', isa => 'Str', required => 1 );
+has Port        => ( is => 'rw', isa => 'Str', default  => '80' );
+has UserName    => ( is => 'rw', isa => 'Str' );
+has PassWord    => ( is => 'rw', isa => 'Str' );
+has Projects    => ( is => 'rw', isa => 'HashRef' );
+has Issues      => ( is => 'rw', isa => 'HashRef' );
+has Users       => ( is => 'rw', isa => 'HashRef' );
+has Statuses    => ( is => 'rw', isa => 'HashRef' );
+has Priorities  => ( is => 'rw', isa => 'HashRef' );
+has Trackers    => ( is => 'rw', isa => 'HashRef' );
+has Categories  => ( is => 'rw', isa => 'HashRef' );
+has LastError   => ( is => 'rw', isa => 'Str', default  => 'No error occured' );
 
 sub BUILD {
   my $self = shift ;
@@ -125,6 +126,31 @@ sub BUILD {
 =head1 METHODS
 
 =cut
+
+=head2 get_last_error
+
+=head3 Description : 
+
+return the last error was occured.
+
+=head3 Parametre :
+
+Nothing
+
+=head3 Return :
+
+$error          a string who was the last error
+
+=head3 Use Exemple :    
+
+    $object->get_last_error;
+
+=cut
+
+sub get_last_error{
+   my($self) = @_;
+   return ($self->{'LastError'});
+}
 
 =head2 load_elements
 
@@ -157,7 +183,8 @@ sub load_elements{
 	$self->{'Statuses'} = decode_json $response->content;
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please statuses load failed' ."\n" ;
+        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please statuses load failed : ' .$response->content."\n" ;
+        croak 'Error : Use print(get_last_error);';            
       }
       $request = HTTP::Request->new( GET => $self->{Url} . '/enumerations.json' );
       $response = $ua->request($request);
@@ -165,7 +192,8 @@ sub load_elements{
 	$self->{'Priorities'} = decode_json $response->content;
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please priorities load failed' ."\n" ;
+        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please priorities load failed : ' .$response->content ."\n" ;
+        croak 'Error : Use print(get_last_error);';
       }
       $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json' );
       $response = $ua->request($request);
@@ -173,7 +201,8 @@ sub load_elements{
 	$self->{'Trackers'} = decode_json $response->content;
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please trackers load failed' ."\n" ;
+        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please trackers load failed : ' .$response->content ."\n" ;
+        croak 'Error : Use print(get_last_error);';
       }
       $request = HTTP::Request->new( GET => $self->{Url} . '/issue_categories.json' );
       $response = $ua->request($request);
@@ -181,7 +210,8 @@ sub load_elements{
 	$self->{'Categories'} = decode_json $response->content;
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please categories load failed' ."\n" ;
+        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please categories load failed : ' .$response->content ."\n" ;
+        croak 'Error : Use print(get_last_error);';
       }
 }
 
@@ -221,11 +251,13 @@ sub load_projects{
 	      $self->{'Projects'} = decode_json $response->content;
          }
          else {
-             croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
+             croak 'Error : Use print(get_last_error);';
          }
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+       $self->{'LastError'} =   $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
+       croak 'Error : Use print(get_last_error);';
       }
 }
 
@@ -266,12 +298,13 @@ sub load_users{
               $self->{'Users'} = decode_json $response->content;
          }
          else {
-             croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+             $self->{'LastError'} =   $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
+             croak 'Error : Use print(get_last_error);';
          }
-
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please (perhaps you need access right to load users) ' ."\n" ;
+        $self->{'LastError'} =   $response->status_line . "\n" . 'Check your config object please (perhaps you need access right to load users) : ' . $response->content   ."\n" ;
+        croak 'Error : Use print(get_last_error);';
       }
 }
 
@@ -311,12 +344,13 @@ sub load_issues{
               $self->{'Issues'} = decode_json $response->content;
          }
          else {
-             croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
+             croak 'Error : Use print(get_last_error);';
          }
-
       }
       else {
-        croak  $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
+        croak 'Error : Use print(get_last_error);';
       }
 }
 
@@ -345,7 +379,8 @@ undef           if the function failed
 sub get_issue_by_id {
     my ( $self, $id ) = @_;
     if ( !(($id) =~ /^\d+$/) ){
-      croak 'the id : "'.$id.'" is not an integer '."\n";
+      $self->{'LastError'} = 'the id : "'.$id.'" is not an integer '."\n";
+      croak 'Error : Use print(get_last_error);';
     }
     if ( defined ( $self->{'Issues'} ) ) {
 	my $issue;
@@ -476,7 +511,8 @@ sub get_project_issues {
         return $ref_hash;
     }
     else {
-        croak print $response->status_line . "\n" . 'Check your config object please' ."\n" ;
+       $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
+       croak 'Error : Use print(get_last_error);';
     }
 }
 
@@ -553,7 +589,9 @@ sub post_issue {
     if ( $response->is_success ) {
 	my $issue = decode_json $response->decoded_content ;
 	my $id = $issue->{'issue'}->{'id'};
-	$self->load_issues;
+	if (defined ( $self->{'issue'} )){
+           $self->load_issues;
+        }
         return $id;
     }
     else {
@@ -1148,7 +1186,8 @@ undef           if the function failed
 sub get_user_by_id {
     my ( $self, $id ) = @_;
     if ( !(($id) =~ /^\d+$/) ){
-      croak 'the id : "'.$id.'" is not an integer '."\n";
+      $self->{'LastError'} =  'the id : "'.$id.'" is not an integer '."\n";
+      croak 'Error : Use print(get_last_error);';
     }
     if ( defined ( $self->{'Users'} ) ) {
 	my $user;
@@ -1405,7 +1444,8 @@ undef           if the function failed
 sub get_project_by_id {
     my ( $self, $id ) = @_;
     if ( !(($id) =~ /^\d+$/) ){
-      croak 'the id : "'.$id.'" is not an integer '."\n";
+      $self->{'LastError'} =  'the id : "'.$id.'" is not an integer '."\n";
+      croak 'Error : Use print(get_last_error);';
     }
     if ( defined ( $self->{'Projects'} ) ) {
         my $project;
