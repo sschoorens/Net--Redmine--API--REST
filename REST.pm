@@ -223,8 +223,8 @@ Set a reference on a hash into the attribute Projects.
 
 =head3 Parametre :
 
-Nothing
-
+[$limit ans $offset]    by default limit = 25 and offset = 0
+ 
 =head3 Return :
 
 Nothing
@@ -232,33 +232,38 @@ Nothing
 =head3 Use Exemple :    
 
     $object->load_projects;
+    OR
+    $object->load_projects(100,0); #the 100 last projects
 
 =cut
 
 sub load_projects{
-      my ( $self ) = @_;
+      my ( $self,$limit,$offset ) = @_;
       my $ua = LWP::UserAgent->new;
       $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
-      my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json' );
-      my $response = $ua->request($request);
-      if ( $response->is_success ) {
-	my $projects = decode_json $response->content;
-        my $count = $projects->{'total_count'};
-	my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json?limit='.$count);      
+      if (defined ( $limit ) and defined ($offset)){ 
+        my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json?limit='.$limit.'&offset='.$offset );
         my $response = $ua->request($request);
-         if ( $response->is_success ) { 
+      	if ( $response->is_success ) {
 	      $self->{'Projects'} = decode_json $response->content;
          }
-         else {
+      	else {
              $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
              croak 'Error : Use print(get_last_error);';
-         }
+      	}
       }
       else {
-       $self->{'LastError'} =   $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
-       croak 'Error : Use print(get_last_error);';
-      }
+       my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json' );
+       my $response = $ua->request($request);
+       if ( $response->is_success ) {
+              $self->{'Projects'} = decode_json $response->content;
+       }
+       else {
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
+             croak 'Error : Use print(get_last_error);';
+       }
+     }
 }
 
 =head2 load_users
@@ -269,8 +274,8 @@ Set a reference on a hash into the attribute Users.
 
 =head3 Parametre :
 
-Nothing
-
+[$limit ans $offset]    by default limit = 25 and offset = 0
+ 
 =head3 Return :
 
 Nothing
@@ -278,34 +283,38 @@ Nothing
 =head3 Use Exemple :    
 
     $object->load_users;
+    OR
+    $object->load_users(100,0); #the 100 last users
 
 =cut
 
 sub load_users{
-      my ( $self ) = @_;
+      my ( $self,$limit,$offset ) = @_;
       my $ua = LWP::UserAgent->new;
       $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
-      my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json' );
-      my $response = $ua->request($request);
-      if ( $response->is_success ) {
-        my $users = decode_json $response->content;
-        my $count = $users->{'total_count'};
-        my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json?limit='.$count);  
+      if (defined ( $limit ) and defined ($offset)){
+        my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json?limit='.$limit.'&offset='.$offset );
         my $response = $ua->request($request);
-         
-         if ( $response->is_success ) { 
+        if ( $response->is_success ) {
               $self->{'Users'} = decode_json $response->content;
          }
-         else {
-             $self->{'LastError'} =   $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
+        else {
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
              croak 'Error : Use print(get_last_error);';
-         }
+        }
       }
       else {
-        $self->{'LastError'} =   $response->status_line . "\n" . 'Check your config object please (perhaps you need access right to load users) : ' . $response->content   ."\n" ;
-        croak 'Error : Use print(get_last_error);';
-      }
+       my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json' );
+       my $response = $ua->request($request);
+       if ( $response->is_success ) {
+              $self->{'Users'} = decode_json $response->content;
+       }
+       else {
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
+             croak 'Error : Use print(get_last_error);';
+       }
+     }
 }
 
 =head2 load_issues
@@ -316,8 +325,8 @@ Set a reference on a hash into the attribute Issues.
 
 =head3 Parametre :
 
-Nothing
-
+[$limit ans $offset]    by default limit = 25 and offset = 0
+ 
 =head3 Return :
 
 Nothing
@@ -325,6 +334,8 @@ Nothing
 =head3 Use Exemple :    
 
     $object->load_issues;
+    OR
+    $object->load_issues(100,0); #the 100 last issues
 
 =cut
 
@@ -333,25 +344,28 @@ sub load_issues{
       my $ua = LWP::UserAgent->new;
       $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
-      my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json' );
-      my $response = $ua->request($request);
-      if ( $response->is_success ) {
-	my $issues = decode_json $response->content;
-        my $count = $issues->{'total_count'};
-        my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json?limit='.$count);
+      if (defined ( $limit ) and defined ($offset)){
+        my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json?limit='.$limit.'&offset='.$offset );
         my $response = $ua->request($request);
-         if ( $response->is_success ) {
+        if ( $response->is_success ) {
               $self->{'Issues'} = decode_json $response->content;
-         }
-         else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
+        }
+        else {
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
              croak 'Error : Use print(get_last_error);';
-         }
+        }
       }
       else {
-        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-        croak 'Error : Use print(get_last_error);';
-      }
+       my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json' );
+       my $response = $ua->request($request);
+       if ( $response->is_success ) {
+              $self->{'Issues'} = decode_json $response->content;
+       }
+       else {
+             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
+             croak 'Error : Use print(get_last_error);';
+       }
+     }
 }
 
 =head2 get_issue_by_id
