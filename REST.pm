@@ -340,7 +340,7 @@ Nothing
 =cut
 
 sub load_issues{
-      my ( $self ) = @_;
+      my ( $self,$limit,$offset) = @_;
       my $ua = LWP::UserAgent->new;
       $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
