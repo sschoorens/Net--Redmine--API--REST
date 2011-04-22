@@ -1,6 +1,1012 @@
+package Net::Redmine::API::REST;
+
+use vars qw($VERSION @EXPORT_OK @ISA);
+
+use strict;
+use warnings;
+use 5.010;
+
+use HTTP::Request;
+use LWP::UserAgent;
+use JSON;
+use Moose;
+use Switch;
+use Carp;
+
+our $VERSION = '0.001';
+
+has Url    => ( is => 'rw', isa => 'Str', required => 1 );
+has Server => ( is => 'rw', isa => 'Str', required => 1 );
+has Port   => ( is => 'rw', isa => 'Str', default  => '80' );
+has UserName   => ( is => 'rw', isa => 'Str' );
+has PassWord   => ( is => 'rw', isa => 'Str' );
+has Projects   => ( is => 'rw', isa => 'HashRef' );
+has Issues     => ( is => 'rw', isa => 'HashRef' );
+has Users      => ( is => 'rw', isa => 'HashRef' );
+has Statuses   => ( is => 'rw', isa => 'HashRef' );
+has Priorities => ( is => 'rw', isa => 'HashRef' );
+has Trackers   => ( is => 'rw', isa => 'HashRef' );
+has Categories => ( is => 'rw', isa => 'HashRef' );
+has LastError =>
+  ( is => 'rw', isa => 'Str', default => 'No error occured' . "\n" );
+
+sub BUILD {
+    my $self = shift;
+    $self->load_elements;
+    return;
+}
+
+sub get_last_error {
+    my ($self) = @_;
+    return ( $self->{'LastError'} );
+}
+
+sub load_elements {
+    my ($self) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->{'Statuses'} = decode_json $response->content;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config object please statuses load failed : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    $request = HTTP::Request->new( GET => $self->{Url} . '/enumerations.json' );
+    $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->{'Priorities'} = decode_json $response->content;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config object please priorities load failed : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json' );
+    $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->{'Trackers'} = decode_json $response->content;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config object please trackers load failed : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    $request =
+      HTTP::Request->new( GET => $self->{Url} . '/issue_categories.json' );
+    $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->{'Categories'} = decode_json $response->content;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config object please categories load failed : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    return;
+}
+
+sub load_projects {
+    my ( $self, $limit, $offset ) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    if ( ( defined $limit ) and ( defined $offset ) ) {
+        my $request =
+          HTTP::Request->new( GET => $self->{Url}
+              . '/projects.json?limit='
+              . $limit
+              . '&offset='
+              . $offset );
+        my $response = $ua->request($request);
+        if ( $response->is_success ) {
+            $self->{'Projects'} = decode_json $response->content;
+        }
+        else {
+            $self->{'LastError'} =
+                $response->status_line . "\n"
+              . 'Check your config object please : '
+              . $response->content . "\n";
+            croak 'Error : Use print(get_last_error);';
+        }
+    }
+    else {
+        my $request =
+          HTTP::Request->new( GET => $self->{Url} . '/projects.json' );
+        my $response = $ua->request($request);
+        if ( $response->is_success ) {
+            $self->{'Projects'} = decode_json $response->content;
+        }
+        else {
+            $self->{'LastError'} =
+                $response->status_line . "\n"
+              . 'Check your config object please : '
+              . $response->content . "\n";
+            croak 'Error : Use print(get_last_error);';
+        }
+    }
+    return;
+}
+
+sub load_users {
+    my ( $self, $limit, $offset ) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    if ( ( defined $limit ) and ( defined $offset ) ) {
+        my $request =
+          HTTP::Request->new( GET => $self->{Url}
+              . '/users.json?limit='
+              . $limit
+              . '&offset='
+              . $offset );
+        my $response = $ua->request($request);
+        if ( $response->is_success ) {
+            $self->{'Users'} = decode_json $response->content;
+        }
+        else {
+            $self->{'LastError'} =
+                $response->status_line . "\n"
+              . 'Check your config object please : '
+              . $response->content . "\n";
+            croak 'Error : Use print(get_last_error);';
+        }
+    }
+    else {
+        my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json' );
+        my $response = $ua->request($request);
+        if ( $response->is_success ) {
+            $self->{'Users'} = decode_json $response->content;
+        }
+        else {
+            $self->{'LastError'} =
+                $response->status_line . "\n"
+              . 'Check your config object please : '
+              . $response->content . "\n";
+            croak 'Error : Use print(get_last_error);';
+        }
+    }
+    return;
+}
+
+sub load_issues {
+    my ( $self, $limit, $offset ) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    if ( ( defined $limit ) and ( defined $offset ) ) {
+        my $request =
+          HTTP::Request->new( GET => $self->{Url}
+              . '/issues.json?limit='
+              . $limit
+              . '&offset='
+              . $offset );
+        my $response = $ua->request($request);
+        if ( $response->is_success ) {
+            $self->{'Issues'} = decode_json $response->content;
+        }
+        else {
+            $self->{'LastError'} =
+                $response->status_line . "\n"
+              . 'Check your config object please : '
+              . $response->content . "\n";
+            croak 'Error : Use print(get_last_error);';
+        }
+    }
+    else {
+        my $request =
+          HTTP::Request->new( GET => $self->{Url} . '/issues.json' );
+        my $response = $ua->request($request);
+        if ( $response->is_success ) {
+            $self->{'Issues'} = decode_json $response->content;
+        }
+        else {
+            $self->{'LastError'} =
+                $response->status_line . "\n"
+              . 'Check your config object please : '
+              . $response->content . "\n";
+            croak 'Error : Use print(get_last_error);';
+        }
+    }
+    return;
+}
+
+sub get_issue_by_id {
+    my ( $self, $id ) = @_;
+    if ( !( ($id) =~ /^\d+$/sxm ) ) {
+        $self->{'LastError'} =
+          'the id : "' . $id . '" is not an integer ' . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    if ( defined( $self->{'Issues'} ) ) {
+        my $issue;
+        my $i = 0;
+        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+            if ( $issue->{'id'} eq $id ) {
+                return $issue;
+            }
+            else {
+                $i++;
+            }
+        }
+        $self->{'LastError'} =
+          q{The issue wasn't found reload issues with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+    else {
+        $self->load_issues;
+        my $issue;
+        my $i = 0;
+        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+            if ( $issue->{'id'} eq $id ) {
+                return $issue;
+            }
+            else {
+                $i++;
+            }
+        }
+        $self->{'LastError'} =
+          q{The issue wasn't found reload issues with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub get_issue_by_subject {
+    my ( $self, $subject ) = @_;
+    if ( defined( $self->issue_subject_to_id($subject) ) ) {
+        return (
+            $self->get_issue_by_id( $self->issue_subject_to_id($subject) ) );
+    }
+    else {
+        $self->{'LastError'} =
+          q{The issue wasn't found reload issues with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub get_issues {
+    my ($self) = @_;
+    if ( defined( $self->{'Issues'} ) ) {
+        return $self->{'Issues'};
+    }
+    else {
+        $self->load_issues;
+        return $self->{'Issues'};
+    }
+}
+
+sub get_project_issues {
+    my ( $self, $name ) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new(
+        GET => $self->{Url} . '/projects/' . $name . '/issues.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        my $ref_hash = decode_json $response->content;
+        return $ref_hash;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub post_issue {
+    my ( $self, $hash_post_issue ) = @_;
+    my $ref_hash = $self->hash_verification_issue( $hash_post_issue, 'post' );
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $json = encode_json $ref_hash ;
+    my $request = HTTP::Request->new( POST => $self->{Url} . '/issues.json' );
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+
+    if ( $response->is_success ) {
+        my $issue = decode_json $response->decoded_content;
+        my $id    = $issue->{'issue'}->{'id'};
+        if ( defined( $self->{'issue'} ) ) {
+            $self->load_issues;
+        }
+        return $id;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub put_issue_by_id {
+    my ( $self, $id, $hash_put_issue ) = @_;
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash = $self->hash_verification_issue( $hash_put_issue, 'put' );
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( PUT => $self->{Url} . '/issues/' . $id . '.json' );
+    my $json = encode_json $ref_hash ;
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+
+    if ( $response->is_success ) {
+        if ( defined( $self->{'issue'} ) ) {
+            $self->load_issues;
+        }
+        return 1;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub delete_issue_by_id {
+    my ( $self, $id ) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( DELETE => $self->{Url} . '/issues/' . $id . '.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->load_issues;
+        return 1;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub issue_subject_to_id {
+    my ( $self, $subject ) = @_;
+    if ( defined( $self->{'Issues'} ) ) {
+        my $issue;
+        my $i = 0;
+        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+            if ( $issue->{'subject'} eq $subject ) {
+                return $issue->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        return;
+    }
+    else {
+        $self->load_issues;
+        my $issue;
+        my $i = 0;
+        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+            if ( $issue->{'subject'} eq $subject ) {
+                return $issue->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        return;
+    }
+}
+
+sub project_name_to_id {
+    my ( $self, $name ) = @_;
+    if ( defined( $self->{'Projects'} ) ) {
+        my $project;
+        my $i = 0;
+        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+            if ( $project->{'name'} eq $name ) {
+                return $project->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        return;
+    }
+    else {
+        $self->load_projects;
+        my $project;
+        my $i = 0;
+        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+            if ( $project->{'name'} eq $name ) {
+                return $project->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        return;
+    }
+}
+
+sub user_login_to_id {
+    my ( $self, $login ) = @_;
+    if ( defined( $self->{'Users'} ) ) {
+        my $user;
+        my $i = 0;
+        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+            if ( $user->{'login'} eq $login ) {
+                return $user->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        return;
+    }
+    else {
+        $self->load_users;
+        my $user;
+        my $i = 0;
+        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+            if ( $user->{'login'} eq $login ) {
+                return $user->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        return;
+    }
+}
+
+sub status_name_to_id {
+    my ( $self, $name ) = @_;
+    my $status;
+    my $i = 0;
+    while ( defined( $status = $self->{'Statuses'}->{'issue_statuses'}[$i] ) ) {
+        if ( $status->{'name'} eq $name ) {
+            return $status->{'id'};
+        }
+        else {
+            $i++;
+        }
+    }
+    return;
+}
+
+sub tracker_name_to_id {
+    my ( $self, $name ) = @_;
+    my $tracker;
+    my $i = 0;
+    while ( defined( $tracker = $self->{'Trackers'}->{'trackers'}[$i] ) ) {
+        if ( $tracker->{'name'} eq $name ) {
+            return $tracker->{'id'};
+        }
+        else {
+            $i++;
+        }
+    }
+    return;
+}
+
+sub priority_name_to_id {
+    my ( $self, $name ) = @_;
+    my $priority;
+    my $i = 0;
+    while ( defined( $priority = $self->{'Priorities'}->{'enumerations'}[$i] ) )
+    {
+        if ( $priority->{'type'} eq q{IssuePriority} ) {
+            if ( $priority->{'name'} eq $name ) {
+                return $priority->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+        else {
+            $i++;
+        }
+    }
+    return;
+}
+
+sub category_name_to_id {
+    my ( $self, $name ) = @_;
+    my $category;
+    my $i = 0;
+    while (
+        defined( $category = $self->{'Categories'}->{'issue_categories'}[$i] ) )
+    {
+        if ( $category->{'name'} eq $name ) {
+            return $category->{'id'};
+        }
+        else {
+            $i++;
+        }
+    }
+    return;
+}
+
+sub hash_verification_issue {
+    my ( $self, $hash, $action ) = @_;
+    my $issue = $hash->{'issue'};
+    if ( $action eq 'post' ) {
+        if (
+            (
+                    ( defined $issue->{'status'} )
+                and ( defined $issue->{'tracker'} )
+                and ( defined $issue->{'priority'} )
+                and ( defined $issue->{'subject'} )
+            )
+            or (    ( defined $issue->{'status_id'} )
+                and ( defined $issue->{'tracker_id'} )
+                and ( defined $issue->{'priority_id'} )
+                and ( defined $issue->{'subject_id'} ) )
+          )
+        {
+            my $result->{'issue'} = $self->reformating_hash($issue);
+            return $result;
+        }
+        else {
+            $self->{'LastError'} =
+q{the elements : status , tracker , priority and subject was required};
+            croak 'Error founded use get_last_error';
+        }
+    }
+    else {
+        my $result->{'issue'} = $self->reformating_hash($issue);
+        return $result;
+    }
+}
+
+sub hash_verification_user {
+    my ( $self, $hash, $action ) = @_;
+    if ( $action eq 'post' ) {
+        if (    defined( $hash->{'user'}{'login'} )
+            and defined( $hash->{'user'}{'mail'} ) )
+        {
+            return $hash;
+        }
+        else {
+            $self->{'LastError'} =
+              q{the elements : login and mail was required};
+            croak 'Error founded use get_last_error';
+        }
+    }
+    else {
+        return $hash;
+    }
+}
+
+sub hash_verification_project {
+    my ( $self, $hash, $action ) = @_;
+    if ( $action eq 'post' ) {
+        if (    defined( $hash->{'project'}{'name'} )
+            and defined( $hash->{'project'}{'identifier'} ) )
+        {
+            return $hash;
+        }
+        else {
+            $self->{'LastError'} =
+              q{the elements : name and identifier was required};
+            croak 'Error founded use get_last_error';
+        }
+    }
+    else {
+        return $hash;
+    }
+}
+
+sub reformating_hash {
+    my ( $self, $issue ) = @_;
+    my $res = {};
+    while ( my ( $c, $v ) = each %{$issue} ) {
+        switch ($c) {
+            case 'status' {
+                if ( defined( $self->status_name_to_id($v) ) ) {
+                    $res->{'status_id'} = $self->status_name_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ Status } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            case 'tracker' {
+                if ( defined( $self->tracker_name_to_id($v) ) ) {
+                    $res->{'tracker_id'} = $self->tracker_name_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ Tracker } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            case 'priority' {
+                if ( defined( $self->priority_name_to_id($v) ) ) {
+                    $res->{'priority_id'} = $self->priority_name_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ Priority } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            case 'category' {
+                if ( defined( $self->category_name_to_id($v) ) ) {
+                    $res->{'category_id'} = $self->category_name_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ Category } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            case 'author' {
+                if ( defined( $self->user_login_to_id($v) ) ) {
+                    $res->{'author_id'} = $self->user_login_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ User } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            case 'assigned_to' {
+                if ( defined( $self->user_login_to_id($v) ) ) {
+                    $res->{'assigned_to_id'} = $self->user_login_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ User } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            case 'project' {
+                if ( defined( $self->project_name_to_id($v) ) ) {
+                    $res->{'project_id'} = $self->project_name_to_id($v);
+                }
+                else {
+                    $self->{'LastError'} = q{ Project } . $v . q{wasn't found};
+                    croak 'Error founded use get_last_error';
+                }
+            }
+            else {
+                $res->{$c} = $v;
+            }
+        }
+    }
+    return $res;
+}
+
+sub get_user_by_id {
+    my ( $self, $id ) = @_;
+    if ( !( ($id) =~ /^\d+$/sxm ) ) {
+        $self->{'LastError'} =
+          'the id : "' . $id . '" is not an integer ' . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    if ( defined( $self->{'Users'} ) ) {
+        my $user;
+        my $i = 0;
+        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+            if ( $user->{'id'} eq $id ) {
+                return $user;
+            }
+            else {
+                $i++;
+            }
+        }
+        $self->{'LastError'} =
+          q{The user wasn't found reload users with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+    else {
+        $self->load_users;
+        my $user;
+        my $i = 0;
+        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+            if ( $user->{'id'} eq $id ) {
+                return $user;
+            }
+            else {
+                $i++;
+            }
+        }
+        $self->{'LastError'} =
+          q{The user wasn't found reload users with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub get_user_by_name {
+    my ( $self, $name ) = @_;
+    if ( defined( $self->user_login_to_id($name) ) ) {
+        return ( $self->get_user_by_id( $self->user_login_to_id($name) ) );
+    }
+    else {
+        $self->{'LastError'} =
+          q{The user wasn't found reload users with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub get_users {
+    my ($self) = @_;
+    if ( defined( $self->{'Users'} ) ) {
+        return $self->{'Users'};
+    }
+    else {
+        $self->load_users;
+        return $self->{'Users'};
+    }
+}
+
+sub post_user {
+    my ( $self, $hash_post_user ) = @_;
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash = $self->hash_verification_user( $hash_post_user, 'post' );
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $json = encode_json $ref_hash ;
+    my $request = HTTP::Request->new( POST => $self->{Url} . '/users.json' );
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+
+    if ( $response->is_success ) {
+        my $user = decode_json $response->decoded_content;
+        my $id   = $user->{'user'}->{'id'};
+        $self->load_users;
+        return $id;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub put_user_by_id {
+    my ( $self, $id, $hash_put_user ) = @_;
+    if ( !( ($id) =~ /^\d+$/sxm ) ) {
+        $self->{'LastError'} =
+          'the id : "' . $id . '" is not an integer ' . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash = $self->hash_verification_user( $hash_put_user, 'put' );
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( PUT => $self->{Url} . '/users/' . $id . '.json' );
+    my $json = encode_json $ref_hash ;
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+
+    if ( $response->is_success ) {
+        $self->load_users;
+        return 1;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub put_user_by_login {
+    my ( $self, $login, $hash_put_user2 ) = @_;
+    if ( defined( $self->user_login_to_id($login) ) ) {
+        return (
+            $self->put_user_by_id(
+                $self->user_login_to_id($login),
+                $hash_put_user2
+            )
+        );
+    }
+    else {
+        $self->{'LastError'} =
+          q{The user wasn't found reload users with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub get_project_by_id {
+    my ( $self, $id ) = @_;
+    if ( !( ($id) =~ /^\d+$/sxm ) ) {
+        $self->{'LastError'} =
+          'the id : "' . $id . '" is not an integer ' . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    if ( defined( $self->{'Projects'} ) ) {
+        my $project;
+        my $i = 0;
+        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+            if ( $project->{'id'} eq $id ) {
+                return $project;
+            }
+            else {
+                $i++;
+            }
+        }
+        $self->{'LastError'} =
+          q{The project wasn't found reload Projects with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+    else {
+        $self->load_projects;
+        my $project;
+        my $i = 0;
+        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+            if ( $project->{'id'} eq $id ) {
+                return $project;
+            }
+            else {
+                $i++;
+            }
+        }
+        $self->{'LastError'} =
+          q{The project wasn't found reload Projects with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub get_project_by_name {
+    my ( $self, $name ) = @_;
+    if ( defined( $self->project_name_to_id($name) ) ) {
+        return ( $self->get_project_by_id( $self->project_name_to_id($name) ) );
+    }
+    else {
+        $self->{'LastError'} =
+          q{The project wasn't found reload Projects with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub post_project {
+    my ( $self, $hash_post_project ) = @_;
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash =
+      $self->hash_verification_project( $hash_post_project, 'post' );
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $json = encode_json $ref_hash ;
+    my $request = HTTP::Request->new( POST => $self->{Url} . '/projects.json' );
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+
+    if ( $response->is_success ) {
+        my $project = decode_json $response->decoded_content;
+        my $id      = $project->{'project'}->{'id'};
+        $self->load_projects;
+        return $id;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub put_project_by_id {
+    my ( $self, $id, $hash_put_project ) = @_;
+    if ( !( ($id) =~ /^\d+$/sxm ) ) {
+        $self->{'LastError'} =
+          'the id : "' . $id . '" is not an integer ' . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    my $ua = LWP::UserAgent->new;
+    my $ref_hash = $self->hash_verification_project( $hash_put_project, 'put' );
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( PUT => $self->{Url} . '/projects/' . $id . '.json' );
+    my $json = encode_json $ref_hash ;
+    $request->header( 'Content-Type' => 'application/json' );
+    $request->content($json);
+    my $response = $ua->request($request);
+
+    if ( $response->is_success ) {
+        $self->load_projects;
+        return 1;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub put_project_by_name {
+    my ( $self, $name, $hash_put_project2 ) = @_;
+    if ( defined( $self->project_name_to_id($name) ) ) {
+        return (
+            $self->put_project_by_id(
+                $self->project_name_to_id($name),
+                $hash_put_project2
+            )
+        );
+    }
+    else {
+        $self->{'LastError'} =
+          q{The project wasn't found reload Projects with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+sub delete_project_by_id {
+    my ( $self, $id ) = @_;
+    if ( !( ($id) =~ /^\d+$/sxm ) ) {
+        $self->{'LastError'} =
+          'the id : "' . $id . '" is not an integer ' . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new(
+        DELETE => $self->{Url} . '/projects/' . $id . '.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+        $self->load_projects;
+        return 1;
+    }
+    else {
+        $self->{'LastError'} =
+            $response->status_line . "\n"
+          . 'Check your config please : '
+          . $response->content . "\n";
+        croak 'Error : Use print(get_last_error);';
+    }
+}
+
+sub delete_project_by_name {
+    my ( $self, $name ) = @_;
+    if ( defined( $self->project_name_to_id($name) ) ) {
+        return (
+            $self->delete_project_by_id( $self->project_name_to_id($name) ) );
+    }
+    else {
+        $self->{'LastError'} =
+          q{The project wasn't found reload Projects with the max limit ? };
+        croak 'Error founded use get_last_error';
+    }
+}
+
+1;
+__END__
+
 =head1 VERSION
 
-This documentation describe Net::Redmine::API::REST version 0.001
+This documentation describe Net::Redmine::API::REST Rev : $Revision$,Url : $HeadURL$,Date : $Date$,Source :  $Source$
 
 =head1 NAME
 
@@ -48,7 +1054,7 @@ This is a module for Redmine's GET,POST,PUT,DELETE manipulation in order :
 Schoorens Stephane
  e-mail : sschoorens@lncsa.com
 
-=head1 LICENCE AND COPYRIGHT
+=head1 LICENSE AND COPYRIGHT
 
 Copyright (c) 2011 LNCSA (contact@lncsa.com)
 
@@ -58,9 +1064,9 @@ This library is free software. You can redistribute it and/or modify it under th
 
 Last modification : nothing.
 
-=head1 SEE ALSO
+=head1 DEPENDENCIES
 
-HTTP::Request, LWP::UserAgent, JSON, Moose,
+HTTP::Request, LWP::UserAgent, JSON, Moose, Switch, Carp
 
 =head1 DISCLAIMER OF WARRANTY
 
@@ -85,45 +1091,17 @@ FAILURE OF THE SOFTWARE TO OPERATE WITH ANY OTHER SOFTWARE), EVEN IF
 SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
 SUCH DAMAGES.
 
+=head1 DIAGNOSTICS
+
+=head1 CONFIGURATION AND ENVIRONMENT
+
+=head1 INCOMPATIBILITIES
+
+=head1 BUGS AND LIMITATIONS
+
 =cut
 
-package Net::Redmine::API::REST;
-
-use vars qw($VERSION @EXPORT_OK @ISA);
-
-use strict;
-use warnings;
-use 5.010;
-
-use HTTP::Request;
-use LWP::UserAgent;
-use JSON;
-use Moose;
-use Switch;
-use Carp;
-
-our $VERSION = '0.001';
-
-has Url         => ( is => 'rw', isa => 'Str', required => 1 );
-has Server      => ( is => 'rw', isa => 'Str', required => 1 );
-has Port        => ( is => 'rw', isa => 'Str', default  => '80' );
-has UserName    => ( is => 'rw', isa => 'Str' );
-has PassWord    => ( is => 'rw', isa => 'Str' );
-has Projects    => ( is => 'rw', isa => 'HashRef' );
-has Issues      => ( is => 'rw', isa => 'HashRef' );
-has Users       => ( is => 'rw', isa => 'HashRef' );
-has Statuses    => ( is => 'rw', isa => 'HashRef' );
-has Priorities  => ( is => 'rw', isa => 'HashRef' );
-has Trackers    => ( is => 'rw', isa => 'HashRef' );
-has Categories  => ( is => 'rw', isa => 'HashRef' );
-has LastError   => ( is => 'rw', isa => 'Str', default  => 'No error occured'."\n" );
-
-sub BUILD {
-  my $self = shift ;
-  $self->load_elements;
-}
-
-=head1 METHODS
+=head1 SUBROUTINES/METHODS
 
 =cut
 
@@ -147,11 +1125,6 @@ $error          a string who was the last error
 
 =cut
 
-sub get_last_error{
-   my($self) = @_;
-   return ($self->{'LastError'});
-}
-
 =head2 load_elements
 
 =head3 Description : 
@@ -172,49 +1145,6 @@ Nothing
 
 =cut
 
-sub load_elements{
-      my ( $self ) = @_;
-      my $ua = LWP::UserAgent->new;
-      $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-      my $request = HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json' );
-      my $response = $ua->request($request);
-      if ( $response->is_success ) {
-	$self->{'Statuses'} = decode_json $response->content;
-      }
-      else {
-        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please statuses load failed : ' .$response->content."\n" ;
-        croak 'Error : Use print(get_last_error);';            
-      }
-      $request = HTTP::Request->new( GET => $self->{Url} . '/enumerations.json' );
-      $response = $ua->request($request);
-      if ( $response->is_success ) {
-	$self->{'Priorities'} = decode_json $response->content;
-      }
-      else {
-        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please priorities load failed : ' .$response->content ."\n" ;
-        croak 'Error : Use print(get_last_error);';
-      }
-      $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json' );
-      $response = $ua->request($request);
-      if ( $response->is_success ) {
-	$self->{'Trackers'} = decode_json $response->content;
-      }
-      else {
-        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please trackers load failed : ' .$response->content ."\n" ;
-        croak 'Error : Use print(get_last_error);';
-      }
-      $request = HTTP::Request->new( GET => $self->{Url} . '/issue_categories.json' );
-      $response = $ua->request($request);
-      if ( $response->is_success ) {
-	$self->{'Categories'} = decode_json $response->content;
-      }
-      else {
-        $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please categories load failed : ' .$response->content ."\n" ;
-        croak 'Error : Use print(get_last_error);';
-      }
-}
-
 =head2 load_projects
 
 =head3 Description : 
@@ -224,7 +1154,7 @@ Set a reference on a hash into the attribute Projects.
 =head3 Parametre :
 
 [$limit ans $offset]    by default limit = 25 and offset = 0
- 
+
 =head3 Return :
 
 Nothing
@@ -237,35 +1167,6 @@ Nothing
 
 =cut
 
-sub load_projects{
-      my ( $self,$limit,$offset ) = @_;
-      my $ua = LWP::UserAgent->new;
-      $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-      if (defined ( $limit ) and defined ($offset)){ 
-        my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json?limit='.$limit.'&offset='.$offset );
-        my $response = $ua->request($request);
-      	if ( $response->is_success ) {
-	      $self->{'Projects'} = decode_json $response->content;
-         }
-      	else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-             croak 'Error : Use print(get_last_error);';
-      	}
-      }
-      else {
-       my $request = HTTP::Request->new( GET => $self->{Url} . '/projects.json' );
-       my $response = $ua->request($request);
-       if ( $response->is_success ) {
-              $self->{'Projects'} = decode_json $response->content;
-       }
-       else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-             croak 'Error : Use print(get_last_error);';
-       }
-     }
-}
-
 =head2 load_users
 
 =head3 Description : 
@@ -275,7 +1176,7 @@ Set a reference on a hash into the attribute Users.
 =head3 Parametre :
 
 [$limit ans $offset]    by default limit = 25 and offset = 0
- 
+
 =head3 Return :
 
 Nothing
@@ -288,35 +1189,6 @@ Nothing
 
 =cut
 
-sub load_users{
-      my ( $self,$limit,$offset ) = @_;
-      my $ua = LWP::UserAgent->new;
-      $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-      if (defined ( $limit ) and defined ($offset)){
-        my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json?limit='.$limit.'&offset='.$offset );
-        my $response = $ua->request($request);
-        if ( $response->is_success ) {
-              $self->{'Users'} = decode_json $response->content;
-         }
-        else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-             croak 'Error : Use print(get_last_error);';
-        }
-      }
-      else {
-       my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json' );
-       my $response = $ua->request($request);
-       if ( $response->is_success ) {
-              $self->{'Users'} = decode_json $response->content;
-       }
-       else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-             croak 'Error : Use print(get_last_error);';
-       }
-     }
-}
-
 =head2 load_issues
 
 =head3 Description : 
@@ -326,7 +1198,7 @@ Set a reference on a hash into the attribute Issues.
 =head3 Parametre :
 
 [$limit ans $offset]    by default limit = 25 and offset = 0
- 
+
 =head3 Return :
 
 Nothing
@@ -338,35 +1210,6 @@ Nothing
     $object->load_issues(100,0); #the 100 last issues
 
 =cut
-
-sub load_issues{
-      my ( $self,$limit,$offset) = @_;
-      my $ua = LWP::UserAgent->new;
-      $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-      if (defined ( $limit ) and defined ($offset)){
-        my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json?limit='.$limit.'&offset='.$offset );
-        my $response = $ua->request($request);
-        if ( $response->is_success ) {
-              $self->{'Issues'} = decode_json $response->content;
-        }
-        else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-             croak 'Error : Use print(get_last_error);';
-        }
-      }
-      else {
-       my $request = HTTP::Request->new( GET => $self->{Url} . '/issues.json' );
-       my $response = $ua->request($request);
-       if ( $response->is_success ) {
-              $self->{'Issues'} = decode_json $response->content;
-       }
-       else {
-             $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content  ."\n" ;
-             croak 'Error : Use print(get_last_error);';
-       }
-     }
-}
 
 =head2 get_issue_by_id
 
@@ -390,42 +1233,6 @@ undef           if the function failed
 
 =cut
 
-sub get_issue_by_id {
-    my ( $self, $id ) = @_;
-    if ( !(($id) =~ /^\d+$/) ){
-      $self->{'LastError'} = 'the id : "'.$id.'" is not an integer '."\n";
-      croak 'Error : Use print(get_last_error);';
-    }
-    if ( defined ( $self->{'Issues'} ) ) {
-	my $issue;
-	my $i=0;
-	while ( defined($issue=$self->{'Issues'}->{'issues'}[$i] ) ) {
-	      if ($issue->{'id'} eq $id){
-		  return  $issue;
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-        return undef;
-    }
-    else{
-      $self->load_issues;
-      my $issue;
-      my $i=0;
-      while ( defined( $issue=$self->{'Issues'}->{'issues'}[$i] ) ) {
-	      if ($issue->{'id'} eq $id){
-		  return  $issue;
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-       return undef;
-    }
-    
-}
-
 =head2 get_issue_by_subject
 
 =head3 Description : 
@@ -447,16 +1254,6 @@ undef        if not exists
     my $ref_hash=$object->get_issue_by_subject('test');
 
 =cut
-
-sub get_issue_by_subject {
-    my ( $self, $subject ) = @_;
-    if ( defined ( $self->issue_subject_to_id($subject)  ) ){
-      return ( $self->get_issue_by_id( $self->issue_subject_to_id($subject) ) );   
-    }
-    else{
-       return undef; 
-    }
-}
 
 =head2 get_issues
 
@@ -480,18 +1277,7 @@ $issue          return a reference on a hash
 
 =cut
 
-
-sub get_issues {
-    my ($self) = @_;
-    if ( defined($self->{'Issues'} ) ){
-      return $self->{'Issues'};
-    }else{
-	$self->load_issues ;
-      return $self->{'Issues'};
-    }
-}
-
-=head2 get_issues
+=head2 get_project_issues
 
 =head3 Description : 
 
@@ -509,26 +1295,9 @@ $ref_hash       return a reference on a hash
 
 =head3 Use Exemple :    
 
-    my $ref_hash=$object->get_issues('test');
+    my $ref_hash=$object->get_project_issues('test');
 
 =cut
-
-sub get_project_issues {
-    my ($self,$name) = @_;
-    my $ua = LWP::UserAgent->new;
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request = HTTP::Request->new( GET => $self->{Url}.'/projects/'.$name. '/issues.json' );
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-        my $ref_hash = decode_json $response->content;
-        return $ref_hash;
-    }
-    else {
-       $self->{'LastError'} =  $response->status_line . "\n" . 'Check your config object please : ' . $response->content   ."\n" ;
-       croak 'Error : Use print(get_last_error);';
-    }
-}
 
 =head2 post_issue
 
@@ -561,8 +1330,6 @@ $hash           A reference on a hash construct like this :
 
 $id        when the POST request it's done
 
-0         if the function failed
-
 =head3 Use Exemple :  
 
     my $hash={
@@ -589,30 +1356,6 @@ $id        when the POST request it's done
 
 =cut
 
-sub post_issue {
-    my ( $self, $hash ) = @_;
-    my $ref_hash = $self->hash_verification($hash,'post');
-    my $ua = LWP::UserAgent->new;
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $json = encode_json $ref_hash ;
-    my $request = HTTP::Request->new( POST => $self->{Url} . '/issues.json' );
-    $request->header( 'Content-Type' => 'application/json' );
-    $request->content($json);
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-	my $issue = decode_json $response->decoded_content ;
-	my $id = $issue->{'issue'}->{'id'};
-	if (defined ( $self->{'issue'} )){
-           $self->load_issues;
-        }
-        return $id;
-    }
-    else {
-        return 0;
-    }
-}
-
 =head2 put_issue_by_id
 
 =head3 Description : 
@@ -635,8 +1378,6 @@ $hash           A reference on a hash construct like this :
 
 1               when the PUT request it's done
 
-0               if the function failed
-
 =head3 Use Exemple : 
 
     my $hash={
@@ -650,28 +1391,6 @@ $hash           A reference on a hash construct like this :
         say 'Great Job !';
     }
 =cut
-
-sub put_issue_by_id {
-    my ( $self, $id, $hash ) = @_;
-    my $ua = LWP::UserAgent->new;
-    my $ref_hash = $self->hash_verification($hash,'put');
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request =
-      HTTP::Request->new( PUT => $self->{Url} . '/issues/' . $id . '.json' );
-    my $json = encode_json $ref_hash ;
-    $request->header( 'Content-Type' => 'application/json' );
-    $request->content($json);
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-	$self->load_issues;
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
-
 
 =head2 delete_issue_by_id
 
@@ -697,23 +1416,6 @@ $id             Issue's ID
 
 =cut
 
-sub delete_issue_by_id {
-    my ( $self, $id ) = @_;
-    my $ua = LWP::UserAgent->new;
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request =
-      HTTP::Request->new( DELETE => $self->{Url} . '/issues/' . $id . '.json' );
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-	$self->load_issues;
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
-
 =head2 issue_subject_to_id
 
 =head3 Description : 
@@ -738,36 +1440,6 @@ undef           if the function failed
 
 =cut
 
-sub issue_subject_to_id{
-    my ( $self, $subject ) = @_;
-    if ( defined ( $self->{'Issues'} ) ){
-      my $issue;
-      my $i=0;
-      while ( defined( $issue=$self->{'Issues'}->{'issues'}[$i] ) ) {
-              if ($issue->{'subject'} eq $subject){
-                  return  $issue->{'id'};
-              }
-              else{
-              $i++;
-              }
-        }
-      return undef;
-    }else{
-      $self-> load_issues ;
-      my $issue;
-      my $i=0;
-      while ( defined( $issue=$self->{'Issues'}->{'issues'}[$i] ) ) {
-              if ($issue->{'subject'} eq $subject){
-                  return  $issue->{'id'};
-              }
-              else{
-              $i++;
-              }
-        }
-      return undef;
-    }
-}
-
 =head2 project_name_to_id
 
 =head3 Description : 
@@ -791,35 +1463,6 @@ undef           if the function failed
     }
 
 =cut
-sub project_name_to_id{
-    my ( $self, $name ) = @_;
-    if ( defined ( $self->{'Projects'} ) ){
-      my $project;
-      my $i=0;
-      while ( defined( $project=$self->{'Projects'}->{'projects'}[$i] ) ) {
-	      if ($project->{'name'} eq $name){
-		  return  $project->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-      return undef;
-    }else{
-      $self-> load_projects ;
-      my $project;
-      my $i=0;
-      while ( defined( $project=$self->{'Projects'}->{'projects'}[$i] ) ) {
-	      if ($project->{'name'} eq $name){
-		  return  $project->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-      return undef;
-    }
-}
 
 =head2 user_login_to_id
 
@@ -845,37 +1488,6 @@ undef           if the function failed
 
 =cut
 
-sub user_login_to_id{
-    my ( $self, $login ) = @_;
-    if ( defined ( $self->{'Users'} ) ){
-	my $user;
-	my $i=0;
-	while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
-	      if ($user->{'login'} eq $login){
-		  return  $user->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-	return undef;
-    }
-    else {
-	$self->load_users ;
-	my $user;
-	my $i=0;
-	while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
-	      if ($user->{'login'} eq $login){
-		  return  $user->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-	return undef;
-    }
-}
-
 =head2 status_name_to_id
 
 =head3 Description : 
@@ -899,21 +1511,6 @@ undef           if the function failed
     }
 
 =cut
-
-sub status_name_to_id{
-    my ( $self, $name ) = @_;
-    my $status;
-    my $i = 0 ;
-    while ( defined( $status=$self->{'Statuses'}->{'issue_statuses'}[$i] ) ) {
-	      if ($status->{'name'} eq $name){
-		  return  $status->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-    return undef ;   
-}
 
 =head2 tracker_name_to_id
 
@@ -939,21 +1536,6 @@ undef           if the function failed
 
 =cut
 
-sub tracker_name_to_id{
-    my ( $self, $name ) = @_;
-    my $tracker;
-    my $i = 0 ;
-    while ( defined( $tracker=$self->{'Trackers'}->{'trackers'}[$i] ) ) {
-	      if ($tracker->{'name'} eq $name){
-		  return  $tracker->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-    return undef ;   
-}
-
 =head2 priority_name_to_id
 
 =head3 Description : 
@@ -977,26 +1559,6 @@ undef           if the function failed
     }
 
 =cut
-
-sub priority_name_to_id{
-    my ( $self, $name ) = @_;
-    my $priority;
-    my $i = 0 ;
-    while ( defined( $priority=$self->{'Priorities'}->{'enumerations'}[$i] ) ) {
-	      if ( $priority->{'type'} eq q{IssuePriority} ){
-		  if ( $priority->{'name'} eq $name ){
-		    return  $priority->{'id'};
-		    }
-		  else{
-		    $i++;
-		  }
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-    return undef ; 
-}
 
 =head2 category_name_to_id
 
@@ -1022,22 +1584,7 @@ undef           if the function failed
 
 =cut
 
-sub category_name_to_id{
-    my ( $self, $name ) = @_;
-    my $category;
-    my $i = 0 ;
-    while ( defined( $category=$self->{'Categories'}->{'issue_categories'}[$i] ) ) {
-	      if ($category->{'name'} eq $name){
-		  return  $category->{'id'};
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-    return undef ; 
-}
-
-=head2 hash_verification
+=head2 hash_verification_issue
 
 =head3 Description : 
 
@@ -1057,124 +1604,86 @@ $result             return a good hash reference
 
 =head3 Use Exemple :    
 
-    if( ref( $object->hash_verification($refhash,'post') ) eq 'HASH' ){
+    if( ref( $object->hash_verification_issue($refhash,'post') ) eq 'HASH' ){
         say 'you can post the function return';
     }
 
 =cut
 
-sub hash_verification{
-  my ($self, $hash,$action) = @_;
-   my @cles = keys(%{$hash});
-   my $cle = $cles[0];
-   my $res = {};
-   switch ($cle){
-      case 'issue'{
-	  my $issue =  $hash->{$cle};
-	if  ( $action eq 'post' ){
-	  if ( ( defined( $issue->{'status'} ) and defined( $issue->{'tracker'} ) and defined( $issue->{'priority'} ) and defined( $issue->{'subject'} ) ) 
-	      or ( defined( $issue->{'status_id'} ) and defined( $issue->{'tracker_id'} ) and defined( $issue->{'priority_id'} ) and defined( $issue->{'subject_id'} ) ) ) 
-          {
-	     while (my ($c,$v) = each %{$issue}){
-		switch ($c){
-		      case 'status' {
-			  $res->{'status_id'} = $self->status_name_to_id($v);
-		      }
-		      case 'tracker' {
-			  $res->{'tracker_id'} = $self->tracker_name_to_id($v);
-		      }
-		      case 'priority' {
-			  $res->{'priority_id'} = $self->priority_name_to_id($v);
-		      }
-		      case 'category' {
-			  $res->{'category_id'} = $self->category_name_to_id($v);
-		      }
-		      case 'author' {
-			  $res->{'author_id'} = $self->user_login_to_id($v);
-		      }
-		      case 'assigned_to' {
-			  $res->{'assigned_to_id'} = $self->user_login_to_id($v);
-		      }
-		      case 'project' {
-			  $res->{'project_id'} = $self->project_name_to_id($v);
-		      }
-		      else{
-                          $res->{$c} = $v;
-                      }
-		}
-	     }
-	     my $result->{'issue'} = $res;
-	     return $result;
-	  }
-	  else
-	  {
-	    return 0 ;
-	  }
-        }
-      else{
-	while (my ($c,$v) = each %{$issue}){
-		switch ($c){
-		      case 'status' {
-			  $res->{'status_id'} = $self->status_name_to_id($v);
-		      }
-		      case 'tracker' {
-			  $res->{'tracker_id'} = $self->tracker_name_to_id($v);
-		      }
-		      case 'priority' {
-			  $res->{'priority_id'} = $self->priority_name_to_id($v);
-		      }
-		      case 'category' {
-			  $res->{'category_id'} = $self->category_name_to_id($v);
-		      }
-		      case 'author' {
-			  $res->{'author_id'} = $self->user_login_to_id($v);
-		      }
-		      case 'assigned_to' {
-			  $res->{'assigned_to_id'} = $self->user_login_to_id($v);
-		      }
-		      case 'project' {
-			  $res->{'project_id'} = $self->project_name_to_id($v);
-		      }
-		      else{
-                          $res->{$c} = $v;
-                      }
-		}
-	     }
-	 my $result->{'issue'} = $res;
-	 return $result;
-      }
-     }
-     case 'user' {
-	if  ($action eq 'post'){ 
-	  if ( defined($hash->{'user'}{'login'}) and defined($hash->{'user'}{'mail'}) ){
-	      return $hash ;
-	  }
-	  else{
-	      return 0 ;
-	  }
-      }
-      else{
-      return $hash ;
-      }
-     }
-     case 'project' {
-        if  ($action eq 'post'){
-          if ( defined($hash->{'project'}{'name'}) and defined($hash->{'project'}{'identifier'}) ){
-              return $hash ;
-          }
-          else{
-              return 0 ;
-          }
-        }
-        else{
-          return $hash ;
-        }
-     }
-     else {
-	  return 0;
-     }
-  }
-}
+=head2 hash_verification_user
+
+=head3 Description : 
+
+Verify a hash and give a result conform with the protocol
+
+=head3 Parametre :ost
+
+$hash          hash reference will be used to post or put everything on redmine
+
+$action        Post or Put protocol to verify the required elements in Post
+
+=head3 Return :
+
+$result             return a good hash reference
+
+0                   if the function failed
+
+=head3 Use Exemple :    
+
+    if( ref( $object->hash_verification_user($refhash,'post') ) eq 'HASH' ){
+        say 'you can post the function return';
+    }
+
+=cut
+
+=head2 hash_verification_project
+
+=head3 Description : 
+
+Verify a hash and give a result conform with the protocol
+
+=head3 Parametre :ost
+
+$hash          hash reference will be used to post or put everything on redmine
+
+$action        Post or Put protocol to verify the required elements in Post
+
+=head3 Return :
+
+$result             return a good hash reference
+
+0                   if the function failed
+
+=head3 Use Exemple :    
+
+    if( ref( $object->hash_verification_project($refhash,'post') ) eq 'HASH' ){
+        say 'you can post the function return';
+    }
+
+=cut
+
+=head2 reformating_hash
+
+=head3 Description : 
+
+reformate a hash with conform attribute
+
+=head3 Parametre :ost
+
+$issue         hash reference will be used to post or put issue on redmine
+
+=head3 Return :
+
+$res            return a good hash reference
+
+=head3 Use Exemple :    
+
+    if( ref( $object->reformating_hash($refhash,'post') ) eq 'HASH' ){
+        say 'you can post the function return';
+    }
+
+=cut
+
 =head2 get_user_by_id
 
 =head3 Description : 
@@ -1196,41 +1705,6 @@ undef           if the function failed
     my $ref_hash=$object->get_user_by_id($id);
 
 =cut
-
-sub get_user_by_id {
-    my ( $self, $id ) = @_;
-    if ( !(($id) =~ /^\d+$/) ){
-      $self->{'LastError'} =  'the id : "'.$id.'" is not an integer '."\n";
-      croak 'Error : Use print(get_last_error);';
-    }
-    if ( defined ( $self->{'Users'} ) ) {
-	my $user;
-	my $i=0;
-	while ( defined($user=$self->{'Users'}->{'users'}[$i] ) ) {
-	      if ($user->{'id'} eq $id){
-		  return  $user;
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-        return undef;
-    }
-    else{
-      $self->load_users ;
-      my $user;
-      my $i=0;
-      while ( defined( $user=$self->{'Users'}->{'users'}[$i] ) ) {
-	      if ($user->{'id'} eq $id){
-		  return  $user;
-	      }
-	      else{
-	      $i++;
-	      }
-	}
-       return undef;
-    }
-}
 
 =head2 get_user_by_name
 
@@ -1254,16 +1728,6 @@ undef           if not exists or locked
 
 =cut
 
-sub get_user_by_name {
-    my ( $self, $name ) = @_;
-    if ( defined ( $self->user_login_to_id($name)  ) ){
-      return ( $self->get_user_by_id( $self->user_login_to_id($name) ) );
-    }
-    else{
-     return undef;
-    }
-}
-
 =head2 get_users
 
 =head3 Description : 
@@ -1283,17 +1747,6 @@ $ref_hash       return a reference on a hash
     my $ref_hash=$object->get_users();
 
 =cut
-
-
-sub get_users {
-    my ($self) = @_;
-    if ( defined($self->{'Users'} ) ){
-      return $self->{'Users'};
-    }else{
-	$self->load_users ;
-      return $self->{'Users'};
-    }
-}
 
 =head2 post_user
 
@@ -1321,8 +1774,6 @@ $hash           A reference on a hash construct like this :
 
 $id       when the POST request it's done
 
-0         if the function failed
-
 =head3 Use Exemple :  
 
     my $hash={
@@ -1339,31 +1790,6 @@ $id       when the POST request it's done
     }
 
 =cut
-
-sub post_user {
-    my ( $self, $hash ) = @_;
-    my $ua = LWP::UserAgent->new;
-    my $ref_hash = $self->hash_verification($hash,'post');
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $json = encode_json $ref_hash ;
-    my $request = HTTP::Request->new( POST => $self->{Url} . '/users.json' );
-    $request->header( 'Content-Type' => 'application/json' );
-    $request->content($json);
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-	say Dumper $response->decoded_content;
-	my $user = decode_json $response->decoded_content ;
-	my $id = $user->{'user'}->{'id'};
-	$self->load_users;
-        return $id;
-    }
-    else {
-        return 0;
-    }
-}
-
-
 
 =head2 put_user_by_id
 
@@ -1387,8 +1813,6 @@ $hash           A reference on a hash construct like this :
 
 1               when the PUT request it's done
 
-0               if the function failed
-
 =head3 Use Exemple : 
 
     my $hash={
@@ -1402,36 +1826,40 @@ $hash           A reference on a hash construct like this :
     }
 =cut
 
-sub put_user_by_id {
-    my ( $self, $id, $hash ) = @_;
-    my $ua = LWP::UserAgent->new;
-    my $ref_hash = $self->hash_verification($hash,'put');
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request =
-      HTTP::Request->new( PUT => $self->{Url} . '/users/' . $id . '.json' );
-    my $json = encode_json $ref_hash ;
-    $request->header( 'Content-Type' => 'application/json' );
-    $request->content($json);
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-	$self->load_users;
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
+=head2 put_user_by_login
 
-sub put_user_by_login {
-    my ( $self, $login, $hash ) = @_;
-    if ( defined ( $self->user_login_to_id($login)  ) ){
-      return ( $self->put_user_by_id( $self->user_login_to_id($login),$hash ) );
+=head3 Description : 
+
+Send a PUT request with the hash value to the user. You can lock a user by passing { 'status' => '3' } unlock  { 'status' => '1' }
+
+=head3 Parametre :
+
+$login          User's login
+
+$hash           A reference on a hash construct like this : 
+    my $hash={
+        'user' =>
+        {
+            'Redmine key' => 'Value',
+        }
+    };
+
+=head3 Return :
+
+1               when the PUT request it's done
+
+=head3 Use Exemple : 
+
+    my $hash={
+        'user' =>
+        { 
+            'mail' => 'toto@fake.com'
+        }
+    };
+    if ($object->put_user_by_login('toto',$hash) == 1){
+        say 'Great Job !';
     }
-    else{
-     return undef;
-    }
-}
+=cut
 
 =head2 get_project_by_id
 
@@ -1455,41 +1883,6 @@ undef           if the function failed
 
 =cut
 
-sub get_project_by_id {
-    my ( $self, $id ) = @_;
-    if ( !(($id) =~ /^\d+$/) ){
-      $self->{'LastError'} =  'the id : "'.$id.'" is not an integer '."\n";
-      croak 'Error : Use print(get_last_error);';
-    }
-    if ( defined ( $self->{'Projects'} ) ) {
-        my $project;
-        my $i=0;
-        while ( defined($project=$self->{'Projects'}->{'projects'}[$i] ) ) {
-              if ($project->{'id'} eq $id){
-                  return  $project;
-              }
-              else{
-              $i++;
-              }
-        }
-        return undef;
-    }
-    else{
-      $self->load_projects;
-      my $project;
-      my $i=0;
-      while ( defined( $project=$self->{'Projects'}->{'projects'}[$i] ) ) {
-              if ($project->{'id'} eq $id){
-                  return  $project;
-              }
-              else{
-              $i++;
-              }
-        }
-       return undef;
-   }
-}
-
 =head2 get_project_by_name
 
 =head3 Description : 
@@ -1511,16 +1904,6 @@ undef           if not exists or locked
     my $ref_hash=$object->get_project_by_name('test');
 
 =cut
-
-sub get_project_by_name {
-    my ( $self, $name ) = @_;
-    if ( defined ( $self->project_name_to_id($name)  ) ){
-      return ( $self->get_project_by_id( $self->project_name_to_id($name) ) );
-    }
-    else{
-     return undef;
-    }
-}
 
 =head2 post_project
 
@@ -1568,28 +1951,6 @@ $id       when the POST request it's done
 
 =cut
 
-sub post_project {
-    my ( $self, $hash ) = @_;
-    my $ua = LWP::UserAgent->new;
-    my $ref_hash = $self->hash_verification($hash,'post');
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $json = encode_json $ref_hash ;
-    my $request = HTTP::Request->new( POST => $self->{Url} . '/projects.json' );
-    $request->header( 'Content-Type' => 'application/json' );
-    $request->content($json);
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-        my $project = decode_json $response->decoded_content ;
-        my $id = $project->{'project'}->{'id'};
-        $self->load_projects;
-        return $id;
-    }
-    else {
-        return 0;
-    }
-}
-
 =head2 put_project_by_id
 
 =head3 Description : 
@@ -1612,8 +1973,6 @@ $hash           A reference on a hash construct like this :
 
 1               when the PUT request it's done
 
-0               if the function failed
-
 =head3 Use Exemple : 
 
     my $hash={
@@ -1627,36 +1986,40 @@ $hash           A reference on a hash construct like this :
     }
 =cut
 
-sub put_project_by_id {
-    my ( $self, $id, $hash ) = @_;
-    my $ua = LWP::UserAgent->new;
-    my $ref_hash = $self->hash_verification($hash,'put');
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request =
-      HTTP::Request->new( PUT => $self->{Url} . '/projects/' . $id . '.json' );
-    my $json = encode_json $ref_hash ;
-    $request->header( 'Content-Type' => 'application/json' );
-    $request->content($json);
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-        $self->load_projects;
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
+=head2 put_project_by_name
 
-sub put_project_by_name {
-    my ( $self, $name,$hash ) = @_;
-    if ( defined ( $self->project_name_to_id($name)  ) ){
-      return ( $self->put_project_by_id( $self->project_name_to_id($name),$hash ) );
+=head3 Description : 
+
+Send a PUT request with the hash value to the project.
+
+=head3 Parametre :
+
+$name           Project's Name
+
+$hash           A reference on a hash construct like this : 
+    my $hash={
+        'project' =>
+        {
+            'Redmine key' => 'Value',
+        }
+    };
+
+=head3 Return :
+
+1               when the PUT request it's done
+
+=head3 Use Exemple : 
+
+    my $hash={
+        'project' =>
+        { 
+            'name' => 'put_test'
+        }
+    };
+    if ($object->put_project_by_name('test',$hash) == 1){
+        say 'Great Job !';
     }
-    else{
-     return undef;
-    }
-}
+=cut
 
 =head2 delete_project_by_id
 
@@ -1682,32 +2045,24 @@ $id             Project's ID
 
 =cut
 
+=head2 delete_project_by_name
 
-sub delete_project_by_id {
-    my ( $self, $id ) = @_;
-    my $ua = LWP::UserAgent->new;
-    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
-        'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request =
-      HTTP::Request->new( DELETE => $self->{Url} . '/projects/' . $id . '.json' );
-    my $response = $ua->request($request);
-    if ( $response->is_success ) {
-        $self->load_projects;
-        return 1;
-    }
-    else {
-        return 0;
-    }
-}
+=head3 Description : 
 
-sub delete_project_by_name {
-    my ( $self, $name ) = @_;
-    if ( defined ( $self->project_name_to_id($name) ) ){
-      return ( $self->delete_project_by_id( $self->project_name_to_id($name) ) );
-    }
-    else{
-     return undef;
-    }
-}
+Delete an project by name.
 
-1;
+=head3 Parametre :
+
+$name             Project's Name
+
+=head3 Return :
+
+1               return 1 when the delete request is done
+
+=head3 Use Exemple :    
+
+    if( $object->delete_project_by_name('test') == 1 ){
+        say 'you have deleted the project test';
+    }
+
+=cut
