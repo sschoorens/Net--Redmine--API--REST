@@ -12,6 +12,8 @@ use JSON;
 use Moose;
 use Switch;
 use Carp;
+use CHI;
+use Data::Dumper;
 
 our $VERSION = '0.001';
 
@@ -27,12 +29,18 @@ has Statuses   => ( is => 'rw', isa => 'HashRef' );
 has Priorities => ( is => 'rw', isa => 'HashRef' );
 has Trackers   => ( is => 'rw', isa => 'HashRef' );
 has Categories => ( is => 'rw', isa => 'HashRef' );
-has LastError =>
-  ( is => 'rw', isa => 'Str', default => 'No error occured' . "\n" );
+has Cache      => ( is => 'rw', isa => 'Object' );
+has LastError  => ( is => 'rw', isa => 'Str' );
 
 sub BUILD {
-    my $self = shift;
-    $self->load_elements;
+    my ( $self, $args ) = @_;
+    if ( defined $args->{Config_Cache} ) {
+        $self->{'Cache'} = CHI->new( %{ $args->{Config_Cache} } );
+        $self->load_statuses;
+        $self->load_trackers;
+        $self->load_priorities;
+        $self->load_categories;
+    }
     return;
 }
 
@@ -41,7 +49,7 @@ sub get_last_error {
     return ( $self->{'LastError'} );
 }
 
-sub load_elements {
+sub load_statuses {
     my ($self) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
@@ -50,51 +58,100 @@ sub load_elements {
       HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-        $self->{'Statuses'} = decode_json $response->content;
+        if ( defined $self->{'Cache'} ) {
+            $self->{'Cache'}
+              ->set( 'Statuses', decode_json $response->content, '10 minutes' );
+        }
+        else {
+            return ( decode_json $response->content );
+        }
     }
     else {
         $self->{'LastError'} =
             $response->status_line . "\n"
           . 'Check your config object please statuses load failed : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
-    $request = HTTP::Request->new( GET => $self->{Url} . '/enumerations.json' );
-    $response = $ua->request($request);
+    return;
+}
+
+sub load_priorities {
+    my ($self) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
+      HTTP::Request->new( GET => $self->{Url} . '/enumerations.json' );
+    my $response = $ua->request($request);
     if ( $response->is_success ) {
-        $self->{'Priorities'} = decode_json $response->content;
+        if ( defined $self->{'Cache'} ) {
+            $self->{'Cache'}->set( 'Priorities', decode_json $response->content,
+                '10 minutes' );
+        }
+        else {
+            return ( decode_json $response->content );
+        }
     }
     else {
         $self->{'LastError'} =
             $response->status_line . "\n"
           . 'Check your config object please priorities load failed : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
-    $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json' );
-    $response = $ua->request($request);
+    return;
+}
+
+sub load_trackers {
+    my ($self) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json' );
+    my $response = $ua->request($request);
     if ( $response->is_success ) {
-        $self->{'Trackers'} = decode_json $response->content;
+        if ( defined $self->{'Cache'} ) {
+            $self->{'Cache'}
+              ->set( 'Trackers', decode_json $response->content, '10 minutes' );
+        }
+        else {
+            return ( decode_json $response->content );
+        }
     }
     else {
         $self->{'LastError'} =
             $response->status_line . "\n"
           . 'Check your config object please trackers load failed : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
-    $request =
+    return;
+}
+
+sub load_categories {
+    my ($self) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    my $request =
       HTTP::Request->new( GET => $self->{Url} . '/issue_categories.json' );
-    $response = $ua->request($request);
+    my $response = $ua->request($request);
     if ( $response->is_success ) {
-        $self->{'Categories'} = decode_json $response->content;
+        if ( defined $self->{'Cache'} ) {
+            $self->{'Cache'}->set( 'Categories', decode_json $response->content,
+                '10 minutes' );
+        }
+        else {
+            return ( decode_json $response->content );
+        }
     }
     else {
         $self->{'LastError'} =
             $response->status_line . "\n"
           . 'Check your config object please categories load failed : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
     return;
 }
@@ -113,14 +170,23 @@ sub load_projects {
               . $offset );
         my $response = $ua->request($request);
         if ( $response->is_success ) {
-            $self->{'Projects'} = decode_json $response->content;
+            if ( defined $self->{'Cache'} ) {
+                $self->{'Cache'}->set(
+                    'Projects',
+                    decode_json $response->content,
+                    '10 minutes'
+                );
+            }
+            else {
+                return ( decode_json $response->content );
+            }
         }
         else {
             $self->{'LastError'} =
                 $response->status_line . "\n"
               . 'Check your config object please : '
               . $response->content . "\n";
-            croak 'Error : Use print(get_last_error);';
+            croak 'Error : ' . $self->get_last_error;
         }
     }
     else {
@@ -128,14 +194,23 @@ sub load_projects {
           HTTP::Request->new( GET => $self->{Url} . '/projects.json' );
         my $response = $ua->request($request);
         if ( $response->is_success ) {
-            $self->{'Projects'} = decode_json $response->content;
+            if ( defined $self->{'Cache'} ) {
+                $self->{'Cache'}->set(
+                    'Projects',
+                    decode_json $response->content,
+                    '10 minutes'
+                );
+            }
+            else {
+                return ( decode_json $response->content );
+            }
         }
         else {
             $self->{'LastError'} =
                 $response->status_line . "\n"
               . 'Check your config object please : '
               . $response->content . "\n";
-            croak 'Error : Use print(get_last_error);';
+            croak 'Error : ' . $self->get_last_error;
         }
     }
     return;
@@ -155,28 +230,40 @@ sub load_users {
               . $offset );
         my $response = $ua->request($request);
         if ( $response->is_success ) {
-            $self->{'Users'} = decode_json $response->content;
+            if ( defined $self->{'Cache'} ) {
+                $self->{'Cache'}->set( 'Users', decode_json $response->content,
+                    '10 minutes' );
+            }
+            else {
+                return ( decode_json $response->content );
+            }
         }
         else {
             $self->{'LastError'} =
                 $response->status_line . "\n"
               . 'Check your config object please : '
               . $response->content . "\n";
-            croak 'Error : Use print(get_last_error);';
+            croak 'Error : ' . $self->get_last_error;
         }
     }
     else {
         my $request = HTTP::Request->new( GET => $self->{Url} . '/users.json' );
         my $response = $ua->request($request);
         if ( $response->is_success ) {
-            $self->{'Users'} = decode_json $response->content;
+            if ( defined $self->{'Cache'} ) {
+                $self->{'Cache'}->set( 'Users', decode_json $response->content,
+                    '10 minutes' );
+            }
+            else {
+                return ( decode_json $response->content );
+            }
         }
         else {
             $self->{'LastError'} =
                 $response->status_line . "\n"
               . 'Check your config object please : '
               . $response->content . "\n";
-            croak 'Error : Use print(get_last_error);';
+            croak 'Error : ' . $self->get_last_error;
         }
     }
     return;
@@ -196,14 +283,20 @@ sub load_issues {
               . $offset );
         my $response = $ua->request($request);
         if ( $response->is_success ) {
-            $self->{'Issues'} = decode_json $response->content;
+            if ( defined $self->{'Cache'} ) {
+                $self->{'Cache'}->set( 'Issues', decode_json $response->content,
+                    '10 minutes' );
+            }
+            else {
+                return ( decode_json $response->content );
+            }
         }
         else {
             $self->{'LastError'} =
                 $response->status_line . "\n"
               . 'Check your config object please : '
               . $response->content . "\n";
-            croak 'Error : Use print(get_last_error);';
+            croak 'Error : ' . $self->get_last_error;
         }
     }
     else {
@@ -211,14 +304,20 @@ sub load_issues {
           HTTP::Request->new( GET => $self->{Url} . '/issues.json' );
         my $response = $ua->request($request);
         if ( $response->is_success ) {
-            $self->{'Issues'} = decode_json $response->content;
+            if ( defined $self->{'Cache'} ) {
+                $self->{'Cache'}->set( 'Issues', decode_json $response->content,
+                    '10 minutes' );
+            }
+            else {
+                return ( decode_json $response->content );
+            }
         }
         else {
             $self->{'LastError'} =
                 $response->status_line . "\n"
               . 'Check your config object please : '
               . $response->content . "\n";
-            croak 'Error : Use print(get_last_error);';
+            croak 'Error : ' . $self->get_last_error;
         }
     }
     return;
@@ -229,12 +328,19 @@ sub get_issue_by_id {
     if ( !( ($id) =~ /^\d+$/sxm ) ) {
         $self->{'LastError'} =
           'the id : "' . $id . '" is not an integer ' . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
-    if ( defined( $self->{'Issues'} ) ) {
+    my $issues;
+    if ( defined $self->{'Cache'} ) {
+        if ( defined $self->{'Cache'}->get('Issues') ) {
+            $issues = $self->{'Cache'}->get('Issues');
+        }
+        else {
+            $issues = $self->load_issues;
+        }
         my $issue;
         my $i = 0;
-        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+        while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
             if ( $issue->{'id'} eq $id ) {
                 return $issue;
             }
@@ -244,13 +350,13 @@ sub get_issue_by_id {
         }
         $self->{'LastError'} =
           q{The issue wasn't found reload issues with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
     else {
-        $self->load_issues;
+        $issues = $self->load_issues;
         my $issue;
         my $i = 0;
-        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+        while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
             if ( $issue->{'id'} eq $id ) {
                 return $issue;
             }
@@ -260,7 +366,7 @@ sub get_issue_by_id {
         }
         $self->{'LastError'} =
           q{The issue wasn't found reload issues with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -273,18 +379,22 @@ sub get_issue_by_subject {
     else {
         $self->{'LastError'} =
           q{The issue wasn't found reload issues with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
 sub get_issues {
     my ($self) = @_;
-    if ( defined( $self->{'Issues'} ) ) {
-        return $self->{'Issues'};
+    if ( defined $self->{'Cache'} ) {
+        if ( defined $self->{'Cache'}->get('Issues') ) {
+            return $self->{'Cache'}->get('Issues');
+        }
+        else {
+            return $self->load_issues;
+        }
     }
     else {
-        $self->load_issues;
-        return $self->{'Issues'};
+        return $self->load_issues;
     }
 }
 
@@ -306,7 +416,7 @@ sub get_project_issues {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -325,7 +435,7 @@ sub post_issue {
     if ( $response->is_success ) {
         my $issue = decode_json $response->decoded_content;
         my $id    = $issue->{'issue'}->{'id'};
-        if ( defined( $self->{'issue'} ) ) {
+        if ( defined( $self->{'Cache'} ) ) {
             $self->load_issues;
         }
         return $id;
@@ -335,7 +445,7 @@ sub post_issue {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -353,7 +463,7 @@ sub put_issue_by_id {
     my $response = $ua->request($request);
 
     if ( $response->is_success ) {
-        if ( defined( $self->{'issue'} ) ) {
+        if ( defined( $self->{'Cache'} ) ) {
             $self->load_issues;
         }
         return 1;
@@ -363,7 +473,7 @@ sub put_issue_by_id {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -376,7 +486,9 @@ sub delete_issue_by_id {
       HTTP::Request->new( DELETE => $self->{Url} . '/issues/' . $id . '.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-        $self->load_issues;
+        if ( defined( $self->{'Cache'} ) ) {
+            $self->load_issues;
+        }
         return 1;
     }
     else {
@@ -384,16 +496,23 @@ sub delete_issue_by_id {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
 sub issue_subject_to_id {
     my ( $self, $subject ) = @_;
-    if ( defined( $self->{'Issues'} ) ) {
+    my $issues;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Issues') ) {
+            $issues = $self->{'Cache'}->get('Issues');
+        }
+        else {
+            $issues = $self->load_issues;
+        }
         my $issue;
         my $i = 0;
-        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+        while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
             if ( $issue->{'subject'} eq $subject ) {
                 return $issue->{'id'};
             }
@@ -404,10 +523,10 @@ sub issue_subject_to_id {
         return;
     }
     else {
-        $self->load_issues;
+        $issues = $self->load_issues;
         my $issue;
         my $i = 0;
-        while ( defined( $issue = $self->{'Issues'}->{'issues'}[$i] ) ) {
+        while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
             if ( $issue->{'subject'} eq $subject ) {
                 return $issue->{'id'};
             }
@@ -421,10 +540,17 @@ sub issue_subject_to_id {
 
 sub project_name_to_id {
     my ( $self, $name ) = @_;
-    if ( defined( $self->{'Projects'} ) ) {
+    my $projects;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Projects') ) {
+            $projects = $self->{'Cache'}->get('Projects');
+        }
+        else {
+            $projects = $self->load_projects;
+        }
         my $project;
         my $i = 0;
-        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+        while ( defined( $project = $projects->{'projects'}[$i] ) ) {
             if ( $project->{'name'} eq $name ) {
                 return $project->{'id'};
             }
@@ -435,10 +561,10 @@ sub project_name_to_id {
         return;
     }
     else {
-        $self->load_projects;
+        $projects = $self->load_projects;
         my $project;
         my $i = 0;
-        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+        while ( defined( $project = $projects->{'projects'}[$i] ) ) {
             if ( $project->{'name'} eq $name ) {
                 return $project->{'id'};
             }
@@ -452,10 +578,17 @@ sub project_name_to_id {
 
 sub user_login_to_id {
     my ( $self, $login ) = @_;
-    if ( defined( $self->{'Users'} ) ) {
+    my $users;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Users') ) {
+            $users = $self->{'Cache'}->get('Users');
+        }
+        else {
+            $users = $self->load_users;
+        }
         my $user;
         my $i = 0;
-        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+        while ( defined( $user = $users->{'users'}[$i] ) ) {
             if ( $user->{'login'} eq $login ) {
                 return $user->{'id'};
             }
@@ -466,10 +599,10 @@ sub user_login_to_id {
         return;
     }
     else {
-        $self->load_users;
+        $users = $self->load_users;
         my $user;
         my $i = 0;
-        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+        while ( defined( $user = $users->{'users'}[$i] ) ) {
             if ( $user->{'login'} eq $login ) {
                 return $user->{'id'};
             }
@@ -483,14 +616,36 @@ sub user_login_to_id {
 
 sub status_name_to_id {
     my ( $self, $name ) = @_;
-    my $status;
-    my $i = 0;
-    while ( defined( $status = $self->{'Statuses'}->{'issue_statuses'}[$i] ) ) {
-        if ( $status->{'name'} eq $name ) {
-            return $status->{'id'};
+    my $statuses;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Statuses') ) {
+            $statuses = $self->{'Cache'}->get('Statuses');
         }
         else {
-            $i++;
+            $statuses = $self->load_statuses;
+        }
+        my $status;
+        my $i = 0;
+        while ( defined( $status = $statuses->{'issue_statuses'}[$i] ) ) {
+            if ( $status->{'name'} eq $name ) {
+                return $status->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+    }
+    else {
+        $statuses = $self->load_statuses;
+        my $status;
+        my $i = 0;
+        while ( defined( $status = $statuses->{'issue_statuses'}[$i] ) ) {
+            if ( $status->{'name'} eq $name ) {
+                return $status->{'id'};
+            }
+            else {
+                $i++;
+            }
         }
     }
     return;
@@ -498,14 +653,36 @@ sub status_name_to_id {
 
 sub tracker_name_to_id {
     my ( $self, $name ) = @_;
-    my $tracker;
-    my $i = 0;
-    while ( defined( $tracker = $self->{'Trackers'}->{'trackers'}[$i] ) ) {
-        if ( $tracker->{'name'} eq $name ) {
-            return $tracker->{'id'};
+    my $trackers;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Trackers') ) {
+            $trackers = $self->{'Cache'}->get('Trackers');
         }
         else {
-            $i++;
+            $trackers = $self->load_trackers;
+        }
+        my $tracker;
+        my $i = 0;
+        while ( defined( $tracker = $trackers->{'trackers'}[$i] ) ) {
+            if ( $tracker->{'name'} eq $name ) {
+                return $tracker->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+    }
+    else {
+        $trackers = $self->load_trackers;
+        my $tracker;
+        my $i = 0;
+        while ( defined( $tracker = $trackers->{'trackers'}[$i] ) ) {
+            if ( $tracker->{'name'} eq $name ) {
+                return $tracker->{'id'};
+            }
+            else {
+                $i++;
+            }
         }
     }
     return;
@@ -513,20 +690,46 @@ sub tracker_name_to_id {
 
 sub priority_name_to_id {
     my ( $self, $name ) = @_;
-    my $priority;
-    my $i = 0;
-    while ( defined( $priority = $self->{'Priorities'}->{'enumerations'}[$i] ) )
-    {
-        if ( $priority->{'type'} eq q{IssuePriority} ) {
-            if ( $priority->{'name'} eq $name ) {
-                return $priority->{'id'};
+    my $priorities;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Priorities') ) {
+            $priorities = $self->{'Cache'}->get('Priorities');
+        }
+        else {
+            $priorities = $self->load_priorities;
+        }
+        my $priority;
+        my $i = 0;
+        while ( defined( $priority = $priorities->{'enumerations'}[$i] ) ) {
+            if ( $priority->{'type'} eq q{IssuePriority} ) {
+                if ( $priority->{'name'} eq $name ) {
+                    return $priority->{'id'};
+                }
+                else {
+                    $i++;
+                }
             }
             else {
                 $i++;
             }
         }
-        else {
-            $i++;
+    }
+    else {
+        $priorities = $self->load_priorities;
+        my $priority;
+        my $i = 0;
+        while ( defined( $priority = $priorities->{'enumerations'}[$i] ) ) {
+            if ( $priority->{'type'} eq q{IssuePriority} ) {
+                if ( $priority->{'name'} eq $name ) {
+                    return $priority->{'id'};
+                }
+                else {
+                    $i++;
+                }
+            }
+            else {
+                $i++;
+            }
         }
     }
     return;
@@ -534,16 +737,37 @@ sub priority_name_to_id {
 
 sub category_name_to_id {
     my ( $self, $name ) = @_;
-    my $category;
-    my $i = 0;
-    while (
-        defined( $category = $self->{'Categories'}->{'issue_categories'}[$i] ) )
-    {
-        if ( $category->{'name'} eq $name ) {
-            return $category->{'id'};
+    my $categories;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Categories') ) {
+            $categories = $self->{'Cache'}->get('Categories');
         }
         else {
-            $i++;
+            $categories = $self->load_categories;
+        }
+
+        my $category;
+        my $i = 0;
+        while ( defined( $category = $categories->{'issue_categories'}[$i] ) ) {
+            if ( $category->{'name'} eq $name ) {
+                return $category->{'id'};
+            }
+            else {
+                $i++;
+            }
+        }
+    }
+    else {
+        $categories = $self->load_categories;
+        my $category;
+        my $i = 0;
+        while ( defined( $category = $categories->{'issue_categories'}[$i] ) ) {
+            if ( $category->{'name'} eq $name ) {
+                return $category->{'id'};
+            }
+            else {
+                $i++;
+            }
         }
     }
     return;
@@ -572,7 +796,8 @@ sub hash_verification_issue {
         else {
             $self->{'LastError'} =
 q{the elements : status , tracker , priority and subject was required};
-            croak 'Error founded use get_last_error';
+            croak
+'Error : the elements : status , tracker , priority and subject was required';
         }
     }
     else {
@@ -592,7 +817,7 @@ sub hash_verification_user {
         else {
             $self->{'LastError'} =
               q{the elements : login and mail was required};
-            croak 'Error founded use get_last_error';
+            croak 'Error : the elements : login and mail was required';
         }
     }
     else {
@@ -611,7 +836,7 @@ sub hash_verification_project {
         else {
             $self->{'LastError'} =
               q{the elements : name and identifier was required};
-            croak 'Error founded use get_last_error';
+            croak 'Error : the elements : name and identifier was required';
         }
     }
     else {
@@ -629,8 +854,8 @@ sub reformating_hash {
                     $res->{'status_id'} = $self->status_name_to_id($v);
                 }
                 else {
-                    $self->{'LastError'} = q{ Status } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    $self->{'LastError'} = q{ Status } . $v . q{ wasn't found};
+                    croak 'Error: ' . q{ Status } . $v . q{ wasn't found};
                 }
             }
             case 'tracker' {
@@ -638,8 +863,8 @@ sub reformating_hash {
                     $res->{'tracker_id'} = $self->tracker_name_to_id($v);
                 }
                 else {
-                    $self->{'LastError'} = q{ Tracker } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    $self->{'LastError'} = q{ Tracker } . $v . q{ wasn't found};
+                    croak 'Error :' . q{ Tracker } . $v . q{ wasn't found};
                 }
             }
             case 'priority' {
@@ -647,8 +872,9 @@ sub reformating_hash {
                     $res->{'priority_id'} = $self->priority_name_to_id($v);
                 }
                 else {
-                    $self->{'LastError'} = q{ Priority } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    $self->{'LastError'} =
+                      q{ Priority } . $v . q{ wasn't found};
+                    croak 'Error :' . q{ Priority } . $v . q{ wasn't found};
                 }
             }
             case 'category' {
@@ -656,8 +882,9 @@ sub reformating_hash {
                     $res->{'category_id'} = $self->category_name_to_id($v);
                 }
                 else {
-                    $self->{'LastError'} = q{ Category } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    $self->{'LastError'} =
+                      q{ Category } . $v . q{ wasn't found};
+                    croak 'Error :' . q{ Category } . $v . q{ wasn't found};
                 }
             }
             case 'author' {
@@ -665,8 +892,8 @@ sub reformating_hash {
                     $res->{'author_id'} = $self->user_login_to_id($v);
                 }
                 else {
-                    $self->{'LastError'} = q{ User } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    $self->{'LastError'} = q{ User } . $v . q{ wasn't found};
+                    croak 'Error :' . q{ User } . $v . q{ wasn't found};
                 }
             }
             case 'assigned_to' {
@@ -674,8 +901,8 @@ sub reformating_hash {
                     $res->{'assigned_to_id'} = $self->user_login_to_id($v);
                 }
                 else {
-                    $self->{'LastError'} = q{ User } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    $self->{'LastError'} = q{ User } . $v . q{ wasn't found};
+                    croak 'Error :' . q{ User } . $v . q{ wasn't found};
                 }
             }
             case 'project' {
@@ -684,7 +911,7 @@ sub reformating_hash {
                 }
                 else {
                     $self->{'LastError'} = q{ Project } . $v . q{wasn't found};
-                    croak 'Error founded use get_last_error';
+                    croak 'Error :' . q{ Project } . $v . q{ wasn't found};
                 }
             }
             else {
@@ -700,12 +927,19 @@ sub get_user_by_id {
     if ( !( ($id) =~ /^\d+$/sxm ) ) {
         $self->{'LastError'} =
           'the id : "' . $id . '" is not an integer ' . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
-    if ( defined( $self->{'Users'} ) ) {
+    my $users;
+    if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}->get('Users') ) {
+            $users = $self->{'Cache'}->get('Users');
+        }
+        else {
+            $users = $self->load_users;
+        }
         my $user;
         my $i = 0;
-        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+        while ( defined( $user = $users->{'users'}[$i] ) ) {
             if ( $user->{'id'} eq $id ) {
                 return $user;
             }
@@ -715,13 +949,13 @@ sub get_user_by_id {
         }
         $self->{'LastError'} =
           q{The user wasn't found reload users with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
     else {
-        $self->load_users;
+        $users = $self->load_users;
         my $user;
         my $i = 0;
-        while ( defined( $user = $self->{'Users'}->{'users'}[$i] ) ) {
+        while ( defined( $user = $users->{'users'}[$i] ) ) {
             if ( $user->{'id'} eq $id ) {
                 return $user;
             }
@@ -731,30 +965,34 @@ sub get_user_by_id {
         }
         $self->{'LastError'} =
           q{The user wasn't found reload users with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
-sub get_user_by_name {
-    my ( $self, $name ) = @_;
-    if ( defined( $self->user_login_to_id($name) ) ) {
-        return ( $self->get_user_by_id( $self->user_login_to_id($name) ) );
+sub get_user_by_login {
+    my ( $self, $login ) = @_;
+    if ( defined( $self->user_login_to_id($login) ) ) {
+        return ( $self->get_user_by_id( $self->user_login_to_id($login) ) );
     }
     else {
         $self->{'LastError'} =
           q{The user wasn't found reload users with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
 sub get_users {
     my ($self) = @_;
-    if ( defined( $self->{'Users'} ) ) {
-        return $self->{'Users'};
+    if ( defined $self->{'Cache'} ) {
+        if ( defined $self->{'Cache'}->get('Users') ) {
+            return $self->{'Cache'}->get('Users');
+        }
+        else {
+            return $self->load_users;
+        }
     }
     else {
-        $self->load_users;
-        return $self->{'Users'};
+        return $self->load_users;
     }
 }
 
@@ -773,7 +1011,9 @@ sub post_user {
     if ( $response->is_success ) {
         my $user = decode_json $response->decoded_content;
         my $id   = $user->{'user'}->{'id'};
-        $self->load_users;
+        if ( defined $self->{'Cache'} ) {
+            $self->load_users;
+        }
         return $id;
     }
     else {
@@ -790,7 +1030,7 @@ sub put_user_by_id {
     if ( !( ($id) =~ /^\d+$/sxm ) ) {
         $self->{'LastError'} =
           'the id : "' . $id . '" is not an integer ' . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
     my $ua = LWP::UserAgent->new;
     my $ref_hash = $self->hash_verification_user( $hash_put_user, 'put' );
@@ -804,7 +1044,9 @@ sub put_user_by_id {
     my $response = $ua->request($request);
 
     if ( $response->is_success ) {
-        $self->load_users;
+        if ( defined $self->{'Cache'} ) {
+            $self->load_users;
+        }
         return 1;
     }
     else {
@@ -812,7 +1054,7 @@ sub put_user_by_id {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -829,7 +1071,7 @@ sub put_user_by_login {
     else {
         $self->{'LastError'} =
           q{The user wasn't found reload users with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -838,12 +1080,19 @@ sub get_project_by_id {
     if ( !( ($id) =~ /^\d+$/sxm ) ) {
         $self->{'LastError'} =
           'the id : "' . $id . '" is not an integer ' . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
-    if ( defined( $self->{'Projects'} ) ) {
+    my $projects;
+    if ( defined $self->{'Cache'} ) {
+        if ( defined $self->{'Cache'}->get('Projects') ) {
+            $projects = $self->{'Cache'}->get('Projects');
+        }
+        else {
+            $projects = $self->load_projects;
+        }
         my $project;
         my $i = 0;
-        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+        while ( defined( $project = $projects->{'projects'}[$i] ) ) {
             if ( $project->{'id'} eq $id ) {
                 return $project;
             }
@@ -853,13 +1102,13 @@ sub get_project_by_id {
         }
         $self->{'LastError'} =
           q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
     else {
-        $self->load_projects;
+        $projects = $self->load_projects;
         my $project;
         my $i = 0;
-        while ( defined( $project = $self->{'Projects'}->{'projects'}[$i] ) ) {
+        while ( defined( $project = $projects->{'projects'}[$i] ) ) {
             if ( $project->{'id'} eq $id ) {
                 return $project;
             }
@@ -869,7 +1118,7 @@ sub get_project_by_id {
         }
         $self->{'LastError'} =
           q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -881,7 +1130,7 @@ sub get_project_by_name {
     else {
         $self->{'LastError'} =
           q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -901,7 +1150,9 @@ sub post_project {
     if ( $response->is_success ) {
         my $project = decode_json $response->decoded_content;
         my $id      = $project->{'project'}->{'id'};
-        $self->load_projects;
+        if ( defined( $self->{'Cache'} ) ) {
+            $self->load_projects;
+        }
         return $id;
     }
     else {
@@ -909,7 +1160,7 @@ sub post_project {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -932,7 +1183,9 @@ sub put_project_by_id {
     my $response = $ua->request($request);
 
     if ( $response->is_success ) {
-        $self->load_projects;
+        if ( defined( $self->{'Cache'} ) ) {
+            $self->load_projects;
+        }
         return 1;
     }
     else {
@@ -940,7 +1193,7 @@ sub put_project_by_id {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -957,7 +1210,7 @@ sub put_project_by_name {
     else {
         $self->{'LastError'} =
           q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -976,7 +1229,9 @@ sub delete_project_by_id {
         DELETE => $self->{Url} . '/projects/' . $id . '.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-        $self->load_projects;
+        if ( defined( $self->{'Cache'} ) ) {
+            $self->load_projects;
+        }
         return 1;
     }
     else {
@@ -984,7 +1239,7 @@ sub delete_project_by_id {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -997,7 +1252,7 @@ sub delete_project_by_name {
     else {
         $self->{'LastError'} =
           q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error founded use get_last_error';
+        croak 'Error : ' . $self->get_last_error;
     }
 }
 
@@ -1125,11 +1380,11 @@ $error          a string who was the last error
 
 =cut
 
-=head2 load_elements
+=head2 load_statuses
 
 =head3 Description : 
 
-Set a reference on a hash into the object's statuses.
+Set a reference on a hash into the object's Cache with the key "Statuses" or return the ref if cache isn't used.
 
 =head3 Parametre :
 
@@ -1137,11 +1392,99 @@ Nothing
 
 =head3 Return :
 
-Nothing
+Return the hash_ref if cache isn't used.
 
 =head3 Use Exemple :    
 
-    $object->load_elements;
+*Without cache
+
+    $hash_ref = $object->load_statuses; (without cache)
+
+*With cache
+
+    $object->load_statuses;
+    $object->{'Cache'}->get ('Statuses'};
+
+=cut
+
+=head2 load_trackers
+
+=head3 Description : 
+
+Set a reference on a hash into the object's Cache with the key "Trackers" or return the ref if cache isn't used.
+
+=head3 Parametre :
+
+Nothing
+
+=head3 Return :
+
+Return the hash_ref if cache isn't used.
+
+=head3 Use Exemple :    
+
+*Without cache
+
+   $hash_ref = $object->load_trackers;
+
+*With cache
+
+    $object->load_trackers;
+    $object->{'Cache'}->get ('Trackers'};
+
+=cut
+
+=head2 load_categories
+
+=head3 Description : 
+
+Set a reference on a hash into the object's Cache with the key "Categories" or return the ref if cache isn't used.
+
+=head3 Parametre :
+
+Nothing
+
+=head3 Return :
+
+Return the hash_ref if cache isn't used.
+
+=head3 Use Exemple : 
+
+*Without cache
+
+    $hash_ref = $object->load_categories;
+
+*With cache
+
+    $object->load_categories;
+    $object->{'Cache'}->get ('Categories'};
+
+=cut
+
+=head2 load_priorities
+
+=head3 Description : 
+
+Set a reference on a hash into the object's Cache with the key "Priorities" or return the ref if cache isn't used.
+
+=head3 Parametre :
+
+Nothing
+
+=head3 Return :
+
+Return the hash_ref if cache isn't used.
+
+=head3 Use Exemple : 
+
+*Without cache
+
+    $hash_ref = $object->load_priorities;
+
+*With cache
+
+    $object->load_priorities;
+    $object->{'Cache'}->get ('Priorities'};
 
 =cut
 
@@ -1149,7 +1492,7 @@ Nothing
 
 =head3 Description : 
 
-Set a reference on a hash into the attribute Projects.
+Set a reference on a hash into the object's Cache with the key "Projects" or return the ref if cache isn't used.
 
 =head3 Parametre :
 
@@ -1157,13 +1500,23 @@ Set a reference on a hash into the attribute Projects.
 
 =head3 Return :
 
-Nothing
+Return the hash_ref if cache isn't used.
 
-=head3 Use Exemple :    
+=head3 Use Exemple :
+
+*Without cache
+
+    $hash_ref = $object->load_projects;
+OR
+    $hash_ref = $object->load_projects(100,0); #the 100 last projects 
+
+*With cache
 
     $object->load_projects;
-    OR
-    $object->load_projects(100,0); #the 100 last projects
+    $object->{'Cache'}->get ('Projects');
+OR
+    $object->load_projects(100,0);
+    $object->{'Cache'}->get ('Projects');
 
 =cut
 
@@ -1171,7 +1524,7 @@ Nothing
 
 =head3 Description : 
 
-Set a reference on a hash into the attribute Users.
+Set a reference on a hash into the object's Cache with the key "Users" or return the ref if cache isn't used.
 
 =head3 Parametre :
 
@@ -1179,13 +1532,24 @@ Set a reference on a hash into the attribute Users.
 
 =head3 Return :
 
-Nothing
+Return the hash_ref if cache isn't used.
 
 =head3 Use Exemple :    
 
+*Without cache
+
+    $hash_ref = $object->load_users;
+OR
+    $hash_ref = $object->load_users(100,0); #the 100 last users 
+
+*With cache
+
     $object->load_users;
-    OR
-    $object->load_users(100,0); #the 100 last users
+    $object->{'Cache'}->get ('Users');
+OR
+    $object->load_users(100,0);
+    $object->{'Cache'}->get ('Users');
+
 
 =cut
 
@@ -1193,7 +1557,7 @@ Nothing
 
 =head3 Description : 
 
-Set a reference on a hash into the attribute Issues.
+Set a reference on a hash into the object's Cache with the key "Issues" or return the ref if cache isn't used.
 
 =head3 Parametre :
 
@@ -1201,13 +1565,23 @@ Set a reference on a hash into the attribute Issues.
 
 =head3 Return :
 
-Nothing
+Return the hash_ref if cache isn't used.
 
 =head3 Use Exemple :    
 
+*Without cache
+
+    $hash_ref = $object->load_issues;
+OR
+    $hash_ref = $object->load_issuess(100,0); #the 100 last issues 
+
+*With cache
+
     $object->load_issues;
-    OR
-    $object->load_issues(100,0); #the 100 last issues
+    $object->{'Cache'}->get ('Issues');
+OR
+    $object->load_issues(100,0);
+#     $object->{'Cache'}->get ('Issues');
 
 =cut
 
