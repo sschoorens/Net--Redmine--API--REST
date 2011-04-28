@@ -13,7 +13,6 @@ use Moose;
 use Switch;
 use Carp;
 use CHI;
-use Data::Dumper;
 
 our $VERSION = '0.001';
 
