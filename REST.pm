@@ -13,6 +13,7 @@ use Moose;
 use Switch;
 use Carp;
 use CHI;
+use Data::Dumper;
 
 our $VERSION = '0.001';
 
@@ -54,12 +55,12 @@ sub load_statuses {
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $request =
-      HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json' );
+        HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
             $self->{'Cache'}
-              ->set( 'Statuses', decode_json $response->content, '10 minutes' );
+                ->set( 'Statuses', decode_json $response->content, '10 minutes' );
         }
         else {
             return ( decode_json $response->content );
@@ -68,8 +69,8 @@ sub load_statuses {
     else {
         $self->{'LastError'} =
             $response->status_line . "\n"
-          . 'Check your config object please statuses load failed : '
-          . $response->content . "\n";
+            . 'Check your config object please statuses load failed : '
+            . $response->content . "\n";
         croak 'Error : ' . $self->get_last_error;
     }
     return;
@@ -371,7 +372,7 @@ sub get_issue_by_id {
 
 sub get_issue_by_subject {
     my ( $self, $subject ) = @_;
-    if ( defined( $self->issue_subject_to_id($subject) ) ) {
+    if ( defined $self->issue_subject_to_id($subject)  ) {
         return (
             $self->get_issue_by_id( $self->issue_subject_to_id($subject) ) );
     }
@@ -434,7 +435,7 @@ sub post_issue {
     if ( $response->is_success ) {
         my $issue = decode_json $response->decoded_content;
         my $id    = $issue->{'issue'}->{'id'};
-        if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}  ) {
             $self->load_issues;
         }
         return $id;
@@ -462,7 +463,7 @@ sub put_issue_by_id {
     my $response = $ua->request($request);
 
     if ( $response->is_success ) {
-        if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'} ) {
             $self->load_issues;
         }
         return 1;
@@ -485,7 +486,7 @@ sub delete_issue_by_id {
       HTTP::Request->new( DELETE => $self->{Url} . '/issues/' . $id . '.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-        if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'}  ) {
             $self->load_issues;
         }
         return 1;
@@ -502,7 +503,7 @@ sub delete_issue_by_id {
 sub issue_subject_to_id {
     my ( $self, $subject ) = @_;
     my $issues;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Issues') ) {
             $issues = $self->{'Cache'}->get('Issues');
         }
@@ -540,7 +541,7 @@ sub issue_subject_to_id {
 sub project_name_to_id {
     my ( $self, $name ) = @_;
     my $projects;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Projects') ) {
             $projects = $self->{'Cache'}->get('Projects');
         }
@@ -578,7 +579,7 @@ sub project_name_to_id {
 sub user_login_to_id {
     my ( $self, $login ) = @_;
     my $users;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Users') ) {
             $users = $self->{'Cache'}->get('Users');
         }
@@ -616,7 +617,7 @@ sub user_login_to_id {
 sub status_name_to_id {
     my ( $self, $name ) = @_;
     my $statuses;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Statuses') ) {
             $statuses = $self->{'Cache'}->get('Statuses');
         }
@@ -653,7 +654,7 @@ sub status_name_to_id {
 sub tracker_name_to_id {
     my ( $self, $name ) = @_;
     my $trackers;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Trackers') ) {
             $trackers = $self->{'Cache'}->get('Trackers');
         }
@@ -690,7 +691,7 @@ sub tracker_name_to_id {
 sub priority_name_to_id {
     my ( $self, $name ) = @_;
     my $priorities;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Priorities') ) {
             $priorities = $self->{'Cache'}->get('Priorities');
         }
@@ -737,7 +738,7 @@ sub priority_name_to_id {
 sub category_name_to_id {
     my ( $self, $name ) = @_;
     my $categories;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Categories') ) {
             $categories = $self->{'Cache'}->get('Categories');
         }
@@ -808,8 +809,8 @@ q{the elements : status , tracker , priority and subject was required};
 sub hash_verification_user {
     my ( $self, $hash, $action ) = @_;
     if ( $action eq 'post' ) {
-        if (    defined( $hash->{'user'}{'login'} )
-            and defined( $hash->{'user'}{'mail'} ) )
+        if (defined $hash->{'user'}{'login'}
+            and defined $hash->{'user'}{'mail'} )
         {
             return $hash;
         }
@@ -827,8 +828,8 @@ sub hash_verification_user {
 sub hash_verification_project {
     my ( $self, $hash, $action ) = @_;
     if ( $action eq 'post' ) {
-        if (    defined( $hash->{'project'}{'name'} )
-            and defined( $hash->{'project'}{'identifier'} ) )
+        if (    defined $hash->{'project'}{'name'}
+            and defined $hash->{'project'}{'identifier'} )
         {
             return $hash;
         }
@@ -849,7 +850,7 @@ sub reformating_hash {
     while ( my ( $c, $v ) = each %{$issue} ) {
         switch ($c) {
             case 'status' {
-                if ( defined( $self->status_name_to_id($v) ) ) {
+                if ( defined $self->status_name_to_id($v) ) {
                     $res->{'status_id'} = $self->status_name_to_id($v);
                 }
                 else {
@@ -858,7 +859,7 @@ sub reformating_hash {
                 }
             }
             case 'tracker' {
-                if ( defined( $self->tracker_name_to_id($v) ) ) {
+                if ( defined $self->tracker_name_to_id($v) ) {
                     $res->{'tracker_id'} = $self->tracker_name_to_id($v);
                 }
                 else {
@@ -867,7 +868,7 @@ sub reformating_hash {
                 }
             }
             case 'priority' {
-                if ( defined( $self->priority_name_to_id($v) ) ) {
+                if ( defined $self->priority_name_to_id($v) ) {
                     $res->{'priority_id'} = $self->priority_name_to_id($v);
                 }
                 else {
@@ -877,7 +878,7 @@ sub reformating_hash {
                 }
             }
             case 'category' {
-                if ( defined( $self->category_name_to_id($v) ) ) {
+                if ( defined $self->category_name_to_id($v) ) {
                     $res->{'category_id'} = $self->category_name_to_id($v);
                 }
                 else {
@@ -887,7 +888,7 @@ sub reformating_hash {
                 }
             }
             case 'author' {
-                if ( defined( $self->user_login_to_id($v) ) ) {
+                if ( defined $self->user_login_to_id($v) ) {
                     $res->{'author_id'} = $self->user_login_to_id($v);
                 }
                 else {
@@ -896,7 +897,7 @@ sub reformating_hash {
                 }
             }
             case 'assigned_to' {
-                if ( defined( $self->user_login_to_id($v) ) ) {
+                if ( defined $self->user_login_to_id($v) ) {
                     $res->{'assigned_to_id'} = $self->user_login_to_id($v);
                 }
                 else {
@@ -905,7 +906,7 @@ sub reformating_hash {
                 }
             }
             case 'project' {
-                if ( defined( $self->project_name_to_id($v) ) ) {
+                if ( defined $self->project_name_to_id($v) ) {
                     $res->{'project_id'} = $self->project_name_to_id($v);
                 }
                 else {
@@ -929,7 +930,7 @@ sub get_user_by_id {
         croak 'Error : ' . $self->get_last_error;
     }
     my $users;
-    if ( defined( $self->{'Cache'} ) ) {
+    if ( defined $self->{'Cache'} ) {
         if ( defined $self->{'Cache'}->get('Users') ) {
             $users = $self->{'Cache'}->get('Users');
         }
@@ -954,7 +955,7 @@ sub get_user_by_id {
         $users = $self->load_users;
         my $user;
         my $i = 0;
-        while ( defined( $user = $users->{'users'}[$i] ) ) {
+        while ( defined ( $user = $users->{'users'}[$i] ) ) {
             if ( $user->{'id'} eq $id ) {
                 return $user;
             }
@@ -970,7 +971,7 @@ sub get_user_by_id {
 
 sub get_user_by_login {
     my ( $self, $login ) = @_;
-    if ( defined( $self->user_login_to_id($login) ) ) {
+    if ( defined $self->user_login_to_id($login) ) {
         return ( $self->get_user_by_id( $self->user_login_to_id($login) ) );
     }
     else {
@@ -1059,7 +1060,7 @@ sub put_user_by_id {
 
 sub put_user_by_login {
     my ( $self, $login, $hash_put_user2 ) = @_;
-    if ( defined( $self->user_login_to_id($login) ) ) {
+    if ( defined $self->user_login_to_id($login) ) {
         return (
             $self->put_user_by_id(
                 $self->user_login_to_id($login),
@@ -1123,7 +1124,7 @@ sub get_project_by_id {
 
 sub get_project_by_name {
     my ( $self, $name ) = @_;
-    if ( defined( $self->project_name_to_id($name) ) ) {
+    if ( defined $self->project_name_to_id($name) ) {
         return ( $self->get_project_by_id( $self->project_name_to_id($name) ) );
     }
     else {
@@ -1149,7 +1150,7 @@ sub post_project {
     if ( $response->is_success ) {
         my $project = decode_json $response->decoded_content;
         my $id      = $project->{'project'}->{'id'};
-        if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'} ) {
             $self->load_projects;
         }
         return $id;
@@ -1182,7 +1183,7 @@ sub put_project_by_id {
     my $response = $ua->request($request);
 
     if ( $response->is_success ) {
-        if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'} ) {
             $self->load_projects;
         }
         return 1;
@@ -1198,7 +1199,7 @@ sub put_project_by_id {
 
 sub put_project_by_name {
     my ( $self, $name, $hash_put_project2 ) = @_;
-    if ( defined( $self->project_name_to_id($name) ) ) {
+    if ( defined $self->project_name_to_id($name) ) {
         return (
             $self->put_project_by_id(
                 $self->project_name_to_id($name),
@@ -1228,7 +1229,7 @@ sub delete_project_by_id {
         DELETE => $self->{Url} . '/projects/' . $id . '.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
-        if ( defined( $self->{'Cache'} ) ) {
+        if ( defined $self->{'Cache'} ) {
             $self->load_projects;
         }
         return 1;
@@ -1244,7 +1245,7 @@ sub delete_project_by_id {
 
 sub delete_project_by_name {
     my ( $self, $name ) = @_;
-    if ( defined( $self->project_name_to_id($name) ) ) {
+    if ( defined $self->project_name_to_id($name) ) {
         return (
             $self->delete_project_by_id( $self->project_name_to_id($name) ) );
     }
@@ -1293,7 +1294,7 @@ This is a module for Redmine's GET,POST,PUT,DELETE manipulation in order :
    exemple :
     my $object = Net::Redmine::API::REST->new ( 
         Url => 'http://redmine.test.com',
-        Server => 'redmine.test.com',
+        Server => 'Redmine API',
         Port => '80',
         UserName => 'user',
         PassWord => 'pass'
@@ -1302,6 +1303,20 @@ This is a module for Redmine's GET,POST,PUT,DELETE manipulation in order :
   -use GET,POST,PUT,DELETE object's methods
    exemple : 
     $object->get_issue_by_id('1');
+
+=head1 Notefication
+
+To modify or posting with custom values use this syntax :
+    $hashref = {
+                    issues => {
+                                    key => value,
+                                    custom_field_values => {
+                                                                id => value,
+                                    },
+                    },
+    };
+
+To use test.t with your redmine set $Redmine_Url,_Server,_Port,_UserName,_PassWord environement variable
 
 =head1 AUTHOR
 
@@ -1717,10 +1732,13 @@ $id        when the POST request it's done
                 'assigned_to' => 'admin',
                 'tracker' => 'bug' ,
                 'project' => 'test',
-		'start_date' => '2011/04/12',
+                'start_date' => '2011/04/12',
                 'due_date' => '2011/04/12',
                 'estimated_hours' => 100.0,
                 'priority' => 'hot',
+                 custom_field_values => {
+                                            '12' => 'put',
+                 },
             }
     };
     if ($object->post_issue($hash) > 0 ){
