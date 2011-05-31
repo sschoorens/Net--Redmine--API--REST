@@ -18,7 +18,7 @@ _ _ _
         PassWord => 'pass'
     );  # object for methods using 
 
-    my $ref_hash = $object->get-issue('1'); # Call of the method get_issue
+    my $ref_hash = $object->get-issue_by_id('1'); # Call of the method get_issue_by_id
     `
 _ _ _
 # DESCRIPTION #
@@ -52,9 +52,9 @@ This is a module for Redmine's **GET,POST,PUT,DELETE** manipulation in order :
 
    exemple : 
 
-    `$object->get_issue('1');`
+    `$object->get_issue_by_id('1');`
 
-Methods return 1 when they have a problem .
+Methods return generaly undef when they have a problem .
 _ _ _
 # AUTHOR #
 
