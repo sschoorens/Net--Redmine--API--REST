@@ -22,13 +22,6 @@ has Server => ( is => 'rw', isa => 'Str', required => 1 );
 has Port   => ( is => 'rw', isa => 'Str', default  => '80' );
 has UserName   => ( is => 'rw', isa => 'Str' );
 has PassWord   => ( is => 'rw', isa => 'Str' );
-has Projects   => ( is => 'rw', isa => 'HashRef' );
-has Issues     => ( is => 'rw', isa => 'HashRef' );
-has Users      => ( is => 'rw', isa => 'HashRef' );
-has Statuses   => ( is => 'rw', isa => 'HashRef' );
-has Priorities => ( is => 'rw', isa => 'HashRef' );
-has Trackers   => ( is => 'rw', isa => 'HashRef' );
-has Categories => ( is => 'rw', isa => 'HashRef' );
 has Cache      => ( is => 'rw', isa => 'Object' );
 has LastError  => ( is => 'rw', isa => 'Str' );
 
