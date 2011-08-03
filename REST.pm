@@ -22,6 +22,15 @@ has Server => ( is => 'rw', isa => 'Str', required => 1 );
 has Port   => ( is => 'rw', isa => 'Str', default  => '80' );
 has UserName   => ( is => 'rw', isa => 'Str' );
 has PassWord   => ( is => 'rw', isa => 'Str' );
+has Projects   => ( is => 'rw', isa => 'HashRef' );
+has Issues     => ( is => 'rw', isa => 'HashRef' );
+has Users      => ( is => 'rw', isa => 'HashRef' );
+has Statuses   => ( is => 'rw', isa => 'HashRef' );
+has Priorities => ( is => 'rw', isa => 'HashRef' );
+has Trackers   => ( is => 'rw', isa => 'HashRef' );
+has Categories => ( is => 'rw', isa => 'HashRef' );
+has Limit      => ( is => 'rw', isa => 'Str', default  => '25' );
+has Offset     => ( is => 'rw', isa => 'Str', default  => '0' );
 has Cache      => ( is => 'rw', isa => 'Object' );
 has LastError  => ( is => 'rw', isa => 'Str' );
 
@@ -29,10 +38,10 @@ sub BUILD {
     my ( $self, $args ) = @_;
     if ( defined $args->{Config_Cache} ) {
         $self->{'Cache'} = CHI->new( %{ $args->{Config_Cache} } );
-        $self->load_statuses;
-        $self->load_trackers;
-        $self->load_priorities;
-        $self->load_categories;
+        $self->load_statuses( $self->{'Limit'},$self->{'Offset'} );
+        $self->load_trackers( $self->{'Limit'},$self->{'Offset'} );
+        $self->load_priorities( $self->{'Limit'},$self->{'Offset'} );
+        $self->load_categories( $self->{'Limit'},$self->{'Offset'} );
     }
     return;
 }
@@ -43,12 +52,15 @@ sub get_last_error {
 }
 
 sub load_statuses {
-    my ($self) = @_;
+    my ($self, $limit, $offset) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $request =
-        HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json' );
+        HTTP::Request->new( GET => $self->{Url} . '/issue_statuses.json?limit='
+              . $limit
+              . '&offset='
+              . $offset );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
@@ -70,12 +82,15 @@ sub load_statuses {
 }
 
 sub load_priorities {
-    my ($self) = @_;
+    my ($self, $limit, $offset) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $request =
-      HTTP::Request->new( GET => $self->{Url} . '/enumerations.json' );
+      HTTP::Request->new( GET => $self->{Url} . '/enumerations.json?limit='
+      . $limit
+      . '&offset='
+      . $offset );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
@@ -97,11 +112,14 @@ sub load_priorities {
 }
 
 sub load_trackers {
-    my ($self) = @_;
+    my ($self, $limit, $offset) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
-    my $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json' );
+    my $request = HTTP::Request->new( GET => $self->{Url} . '/trackers.json?limit='
+                  . $limit
+                  . '&offset='
+                  . $offset );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
@@ -123,12 +141,15 @@ sub load_trackers {
 }
 
 sub load_categories {
-    my ($self) = @_;
+    my ($self, $limit, $offset) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $request =
-      HTTP::Request->new( GET => $self->{Url} . '/issue_categories.json' );
+      HTTP::Request->new( GET => $self->{Url} . '/issue_categories.json?limit='
+                    . $limit
+                    . '&offset='
+                    . $offset );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
@@ -329,7 +350,7 @@ sub get_issue_by_id {
             $issues = $self->{'Cache'}->get('Issues');
         }
         else {
-            $issues = $self->load_issues;
+            $issues = $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         }
         my $issue;
         my $i = 0;
@@ -346,7 +367,7 @@ sub get_issue_by_id {
         croak 'Error : ' . $self->get_last_error;
     }
     else {
-        $issues = $self->load_issues;
+        $issues = $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         my $issue;
         my $i = 0;
         while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
@@ -383,11 +404,11 @@ sub get_issues {
             return $self->{'Cache'}->get('Issues');
         }
         else {
-            return $self->load_issues;
+            return $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         }
     }
     else {
-        return $self->load_issues;
+        return $self->load_issues($self->{'Limit'}, $self->{'Offset'});
     }
 }
 
@@ -429,7 +450,7 @@ sub post_issue {
         my $issue = decode_json $response->decoded_content;
         my $id    = $issue->{'issue'}->{'id'};
         if ( defined $self->{'Cache'}  ) {
-            $self->load_issues;
+            $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         }
         return $id;
     }
@@ -457,7 +478,7 @@ sub put_issue_by_id {
 
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
-            $self->load_issues;
+            $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         }
         return 1;
     }
@@ -480,7 +501,7 @@ sub delete_issue_by_id {
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'}  ) {
-            $self->load_issues;
+            $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         }
         return 1;
     }
@@ -501,7 +522,7 @@ sub issue_subject_to_id {
             $issues = $self->{'Cache'}->get('Issues');
         }
         else {
-            $issues = $self->load_issues;
+            $issues = $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         }
         my $issue;
         my $i = 0;
@@ -516,7 +537,7 @@ sub issue_subject_to_id {
         return;
     }
     else {
-        $issues = $self->load_issues;
+        $issues = $self->load_issues($self->{'Limit'}, $self->{'Offset'});
         my $issue;
         my $i = 0;
         while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
@@ -539,7 +560,7 @@ sub project_name_to_id {
             $projects = $self->{'Cache'}->get('Projects');
         }
         else {
-            $projects = $self->load_projects;
+            $projects = $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         }
         my $project;
         my $i = 0;
@@ -554,7 +575,7 @@ sub project_name_to_id {
         return;
     }
     else {
-        $projects = $self->load_projects;
+        $projects = $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         my $project;
         my $i = 0;
         while ( defined( $project = $projects->{'projects'}[$i] ) ) {
@@ -577,7 +598,7 @@ sub user_login_to_id {
             $users = $self->{'Cache'}->get('Users');
         }
         else {
-            $users = $self->load_users;
+            $users = $self->load_users($self->{'Limit'}, $self->{'Offset'});
         }
         my $user;
         my $i = 0;
@@ -592,7 +613,7 @@ sub user_login_to_id {
         return;
     }
     else {
-        $users = $self->load_users;
+        $users = $self->load_users($self->{'Limit'}, $self->{'Offset'});
         my $user;
         my $i = 0;
         while ( defined( $user = $users->{'users'}[$i] ) ) {
@@ -615,7 +636,7 @@ sub status_name_to_id {
             $statuses = $self->{'Cache'}->get('Statuses');
         }
         else {
-            $statuses = $self->load_statuses;
+            $statuses = $self->load_statuses($self->{'Limit'}, $self->{'Offset'});
         }
         my $status;
         my $i = 0;
@@ -629,7 +650,7 @@ sub status_name_to_id {
         }
     }
     else {
-        $statuses = $self->load_statuses;
+        $statuses = $self->load_statuses($self->{'Limit'}, $self->{'Offset'});
         my $status;
         my $i = 0;
         while ( defined( $status = $statuses->{'issue_statuses'}[$i] ) ) {
@@ -652,7 +673,7 @@ sub tracker_name_to_id {
             $trackers = $self->{'Cache'}->get('Trackers');
         }
         else {
-            $trackers = $self->load_trackers;
+            $trackers = $self->load_trackers($self->{'Limit'}, $self->{'Offset'});
         }
         my $tracker;
         my $i = 0;
@@ -666,7 +687,7 @@ sub tracker_name_to_id {
         }
     }
     else {
-        $trackers = $self->load_trackers;
+        $trackers = $self->load_trackers($self->{'Limit'}, $self->{'Offset'});
         my $tracker;
         my $i = 0;
         while ( defined( $tracker = $trackers->{'trackers'}[$i] ) ) {
@@ -689,7 +710,7 @@ sub priority_name_to_id {
             $priorities = $self->{'Cache'}->get('Priorities');
         }
         else {
-            $priorities = $self->load_priorities;
+            $priorities = $self->load_priorities($self->{'Limit'}, $self->{'Offset'});
         }
         my $priority;
         my $i = 0;
@@ -708,7 +729,7 @@ sub priority_name_to_id {
         }
     }
     else {
-        $priorities = $self->load_priorities;
+        $priorities = $self->load_priorities($self->{'Limit'}, $self->{'Offset'});
         my $priority;
         my $i = 0;
         while ( defined( $priority = $priorities->{'enumerations'}[$i] ) ) {
@@ -736,7 +757,7 @@ sub category_name_to_id {
             $categories = $self->{'Cache'}->get('Categories');
         }
         else {
-            $categories = $self->load_categories;
+            $categories = $self->load_categories($self->{'Limit'}, $self->{'Offset'});
         }
 
         my $category;
@@ -751,7 +772,7 @@ sub category_name_to_id {
         }
     }
     else {
-        $categories = $self->load_categories;
+        $categories = $self->load_categories($self->{'Limit'}, $self->{'Offset'});
         my $category;
         my $i = 0;
         while ( defined( $category = $categories->{'issue_categories'}[$i] ) ) {
@@ -928,7 +949,7 @@ sub get_user_by_id {
             $users = $self->{'Cache'}->get('Users');
         }
         else {
-            $users = $self->load_users;
+            $users = $self->load_users($self->{'Limit'}, $self->{'Offset'});
         }
         my $user;
         my $i = 0;
@@ -945,7 +966,7 @@ sub get_user_by_id {
         croak 'Error : ' . $self->get_last_error;
     }
     else {
-        $users = $self->load_users;
+        $users = $self->load_users($self->{'Limit'}, $self->{'Offset'});
         my $user;
         my $i = 0;
         while ( defined ( $user = $users->{'users'}[$i] ) ) {
@@ -981,11 +1002,11 @@ sub get_users {
             return $self->{'Cache'}->get('Users');
         }
         else {
-            return $self->load_users;
+            return $self->load_users($self->{'Limit'}, $self->{'Offset'});
         }
     }
     else {
-        return $self->load_users;
+        return $self->load_users($self->{'Limit'}, $self->{'Offset'});
     }
 }
 
@@ -1005,7 +1026,7 @@ sub post_user {
         my $user = decode_json $response->decoded_content;
         my $id   = $user->{'user'}->{'id'};
         if ( defined $self->{'Cache'} ) {
-            $self->load_users;
+            $self->load_users($self->{'Limit'}, $self->{'Offset'});
         }
         return $id;
     }
@@ -1038,7 +1059,7 @@ sub put_user_by_id {
 
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
-            $self->load_users;
+            $self->load_users($self->{'Limit'}, $self->{'Offset'});
         }
         return 1;
     }
@@ -1081,7 +1102,7 @@ sub get_project_by_id {
             $projects = $self->{'Cache'}->get('Projects');
         }
         else {
-            $projects = $self->load_projects;
+            $projects = $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         }
         my $project;
         my $i = 0;
@@ -1098,7 +1119,7 @@ sub get_project_by_id {
         croak 'Error : ' . $self->get_last_error;
     }
     else {
-        $projects = $self->load_projects;
+        $projects = $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         my $project;
         my $i = 0;
         while ( defined( $project = $projects->{'projects'}[$i] ) ) {
@@ -1144,7 +1165,7 @@ sub post_project {
         my $project = decode_json $response->decoded_content;
         my $id      = $project->{'project'}->{'id'};
         if ( defined $self->{'Cache'} ) {
-            $self->load_projects;
+            $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         }
         return $id;
     }
@@ -1177,7 +1198,7 @@ sub put_project_by_id {
 
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
-            $self->load_projects;
+            $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         }
         return 1;
     }
@@ -1223,7 +1244,7 @@ sub delete_project_by_id {
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         if ( defined $self->{'Cache'} ) {
-            $self->load_projects;
+            $self->load_projects($self->{'Limit'}, $self->{'Offset'});
         }
         return 1;
     }
@@ -1309,8 +1330,6 @@ To modify or posting with custom values use this syntax :
                     },
     };
 
-To use test.t with your redmine set $Redmine_Url,_Server,_Port,_UserName,_PassWord environement variable
-
 =head1 AUTHOR
 
 Schoorens Stephane
@@ -1364,6 +1383,24 @@ SUCH DAMAGES.
 =cut
 
 =head1 SUBROUTINES/METHODS
+
+=cut
+
+=head2 BUILD
+
+=head3 Description : 
+
+Build the object.
+
+=head3 Parametre :
+
+    Nothing
+
+=head3 Return :
+
+    Nothing
+
+=head3 internal Use    
 
 =cut
 
@@ -2090,7 +2127,8 @@ undef           if the function failed
 
 =cut
 
-=head2 get_user_by_name
+
+=head2 get_user_by_login
 
 =head3 Description : 
 
@@ -2098,7 +2136,7 @@ return a reference on a hash who contains the user
 
 =head3 Parametre :
 
-$name           User's Name
+$name           User's login
 
 =head3 Return :
 
@@ -2108,7 +2146,7 @@ undef           if not exists or locked
 
 =head3 Use Exemple :    
 
-    my $ref_hash=$object->get_user_by_name('toto');
+    my $ref_hash=$object->get_user_by_login('toto');
 
 =cut
 
