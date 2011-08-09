@@ -339,49 +339,30 @@ sub load_issues {
 
 sub get_issue_by_id {
     my ( $self, $id ) = @_;
+    
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    
     if ( !( ($id) =~ /^\d+$/sxm ) ) {
         $self->{'LastError'} =
           'the id : "' . $id . '" is not an integer ' . "\n";
         croak 'Error : ' . $self->get_last_error;
     }
-    my $issues;
-    if ( defined $self->{'Cache'} ) {
-        if ( defined $self->{'Cache'}->get('Issues') ) {
-            $issues = $self->{'Cache'}->get('Issues');
-        }
-        else {
-            $issues = $self->load_issues($self->{'Limit'}, $self->{'Offset'});
-        }
-        my $issue;
-        my $i = 0;
-        while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
-            if ( $issue->{'id'} eq $id ) {
-                return $issue;
-            }
-            else {
-                $i++;
-            }
-        }
-        $self->{'LastError'} =
-          q{The issue wasn't found reload issues with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+    
+    my $request =
+      HTTP::Request->new( GET => $self->{Url} . '/issues/'.$id.'.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+            return ( decode_json $response->content );
     }
     else {
-        $issues = $self->load_issues($self->{'Limit'}, $self->{'Offset'});
-        my $issue;
-        my $i = 0;
-        while ( defined( $issue = $issues->{'issues'}[$i] ) ) {
-            if ( $issue->{'id'} eq $id ) {
-                return $issue;
-            }
-            else {
-                $i++;
-            }
-        }
         $self->{'LastError'} =
-          q{The issue wasn't found reload issues with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+            $response->status_line . "\n"
+          . ' Issue not found '
+          . $response->content . "\n";
     }
+    return;    
 }
 
 sub get_issue_by_subject {
@@ -392,9 +373,9 @@ sub get_issue_by_subject {
     }
     else {
         $self->{'LastError'} =
-          q{The issue wasn't found reload issues with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+          q{ Issue not found };
     }
+    return;
 }
 
 sub get_issues {
@@ -413,13 +394,13 @@ sub get_issues {
 }
 
 sub get_project_issues {
-    my ( $self, $name ) = @_;
+    my ( $self, $id ) = @_;
     my $ua = LWP::UserAgent->new;
     $ua->credentials( $self->{Server} . q{:} . $self->{Port},
         'Redmine API', $self->{UserName} => $self->{PassWord} );
     my $request =
       HTTP::Request->new(
-        GET => $self->{Url} . '/projects/' . $name . '/issues.json' );
+        GET => $self->{Url} . '/projects/' . $id . '/issues.json' );
     my $response = $ua->request($request);
     if ( $response->is_success ) {
         my $ref_hash = decode_json $response->content;
@@ -459,7 +440,7 @@ sub post_issue {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : ' . $self->get_last_error;
+        return;
     }
 }
 
@@ -824,14 +805,14 @@ sub hash_verification_user {
     my ( $self, $hash, $action ) = @_;
     if ( $action eq 'post' ) {
         if (defined $hash->{'user'}{'login'}
-            and defined $hash->{'user'}{'mail'} )
+            and defined $hash->{'user'}{'mail'} and defined $hash->{'user'}{'firstname'} and defined $hash->{'user'}{'lastname'} )
         {
             return $hash;
         }
         else {
             $self->{'LastError'} =
-              q{the elements : login and mail was required};
-            croak 'Error : the elements : login and mail was required';
+              q{the elements : login and mail and firstname and lastname was required};
+            croak 'Error : the elements : login and mail and firstname and lastname was required';
         }
     }
     else {
@@ -943,44 +924,24 @@ sub get_user_by_id {
           'the id : "' . $id . '" is not an integer ' . "\n";
         croak 'Error : ' . $self->get_last_error;
     }
-    my $users;
-    if ( defined $self->{'Cache'} ) {
-        if ( defined $self->{'Cache'}->get('Users') ) {
-            $users = $self->{'Cache'}->get('Users');
-        }
-        else {
-            $users = $self->load_users($self->{'Limit'}, $self->{'Offset'});
-        }
-        my $user;
-        my $i = 0;
-        while ( defined( $user = $users->{'users'}[$i] ) ) {
-            if ( $user->{'id'} eq $id ) {
-                return $user;
-            }
-            else {
-                $i++;
-            }
-        }
-        $self->{'LastError'} =
-          q{The user wasn't found reload users with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+    
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    
+    my $request =
+      HTTP::Request->new( GET => $self->{Url} . '/users/'.$id.'.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+            return ( decode_json $response->content );
     }
     else {
-        $users = $self->load_users($self->{'Limit'}, $self->{'Offset'});
-        my $user;
-        my $i = 0;
-        while ( defined ( $user = $users->{'users'}[$i] ) ) {
-            if ( $user->{'id'} eq $id ) {
-                return $user;
-            }
-            else {
-                $i++;
-            }
-        }
         $self->{'LastError'} =
-          q{The user wasn't found reload users with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+            $response->status_line . "\n"
+          . ' User not found '
+          . $response->content . "\n";
     }
+    return; 
 }
 
 sub get_user_by_login {
@@ -989,9 +950,7 @@ sub get_user_by_login {
         return ( $self->get_user_by_id( $self->user_login_to_id($login) ) );
     }
     else {
-        $self->{'LastError'} =
-          q{The user wasn't found reload users with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+        return;
     }
 }
 
@@ -1035,7 +994,7 @@ sub post_user {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : Use print(get_last_error);';
+        return;
     }
 }
 
@@ -1096,44 +1055,24 @@ sub get_project_by_id {
           'the id : "' . $id . '" is not an integer ' . "\n";
         croak 'Error : ' . $self->get_last_error;
     }
-    my $projects;
-    if ( defined $self->{'Cache'} ) {
-        if ( defined $self->{'Cache'}->get('Projects') ) {
-            $projects = $self->{'Cache'}->get('Projects');
-        }
-        else {
-            $projects = $self->load_projects($self->{'Limit'}, $self->{'Offset'});
-        }
-        my $project;
-        my $i = 0;
-        while ( defined( $project = $projects->{'projects'}[$i] ) ) {
-            if ( $project->{'id'} eq $id ) {
-                return $project;
-            }
-            else {
-                $i++;
-            }
-        }
-        $self->{'LastError'} =
-          q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+    
+    my $ua = LWP::UserAgent->new;
+    $ua->credentials( $self->{Server} . q{:} . $self->{Port},
+        'Redmine API', $self->{UserName} => $self->{PassWord} );
+    
+    my $request =
+      HTTP::Request->new( GET => $self->{Url} . '/projects/'.$id.'.json' );
+    my $response = $ua->request($request);
+    if ( $response->is_success ) {
+            return ( decode_json $response->content );
     }
     else {
-        $projects = $self->load_projects($self->{'Limit'}, $self->{'Offset'});
-        my $project;
-        my $i = 0;
-        while ( defined( $project = $projects->{'projects'}[$i] ) ) {
-            if ( $project->{'id'} eq $id ) {
-                return $project;
-            }
-            else {
-                $i++;
-            }
-        }
         $self->{'LastError'} =
-          q{The project wasn't found reload Projects with the max limit ? };
-        croak 'Error : ' . $self->get_last_error;
+            $response->status_line . "\n"
+          . ' Project not found '
+          . $response->content . "\n";
     }
+    return; 
 }
 
 sub get_project_by_name {
@@ -1174,7 +1113,7 @@ sub post_project {
             $response->status_line . "\n"
           . 'Check your config please : '
           . $response->content . "\n";
-        croak 'Error : ' . $self->get_last_error;
+        return; 
     }
 }
 
